@@ -603,6 +603,53 @@ export default function App() {
     [PLACEHOLDER_POS],
   )
 
+  // ── Ground impact ring · brief "dust cloud" when the drone hits ──
+  // The fall takes ~2s (alt 85 → 0 ease-in). Ring fires once alt drops
+  // below ~5m and expands 0 → 25m over 1s, then fades.
+  const IMPACT_DELAY_MS = 1800
+  const IMPACT_DURATION_MS = 1000
+
+  const groundImpactRadius = useMemo(
+    () =>
+      new CallbackProperty(() => {
+        const tt = telRef.current
+        const phase = tt.kill_chain.phase
+        if (phase !== 'capture' && phase !== 'report') return 0.001
+        const captureT = tt.scenario_clock_ms - PHASE_SCHEDULE.capture
+        const sinceImpact = captureT - IMPACT_DELAY_MS
+        if (sinceImpact <= 0) return 0.001
+        const u = Math.min(1, sinceImpact / IMPACT_DURATION_MS)
+        return Math.max(0.001, 25 * (1 - Math.pow(1 - u, 2)))
+      }, false),
+    [],
+  )
+
+  const groundImpactMaterial = useMemo(
+    () =>
+      new ColorMaterialProperty(
+        new CallbackProperty(() => {
+          const tt = telRef.current
+          const captureT = tt.scenario_clock_ms - PHASE_SCHEDULE.capture
+          const sinceImpact = Math.max(0, captureT - IMPACT_DELAY_MS)
+          const opacity = Math.max(0, 1 - sinceImpact / IMPACT_DURATION_MS) * 0.45
+          return Color.fromCssColorString('#7a8a9e').withAlpha(opacity)
+        }, false),
+      ),
+    [],
+  )
+
+  const groundImpactOutline = useMemo(
+    () =>
+      new CallbackProperty(() => {
+        const tt = telRef.current
+        const captureT = tt.scenario_clock_ms - PHASE_SCHEDULE.capture
+        const sinceImpact = Math.max(0, captureT - IMPACT_DELAY_MS)
+        const opacity = Math.max(0, 1 - sinceImpact / IMPACT_DURATION_MS)
+        return Color.fromCssColorString('#7a8a9e').withAlpha(opacity)
+      }, false),
+    [],
+  )
+
   // ── Pre-fire trail ────────────────────────────────────────────
   // Brief polyline AB-U10 → threat during the engagement instant
   // (last ~0.5s of launch + first ~0.5s of capture). Reads as the
@@ -679,37 +726,60 @@ export default function App() {
                 the marker reads as suspended above its ground point. Labels
                 are pushed further out so they don't crowd the marker. */}
 
-            {/* GCS · ground control station = AB-U10 base */}
-            <Entity name="GCS" position={Cartesian3.fromDegrees(INCHEON.u10_lon, INCHEON.u10_lat, 0)}>
-              <BillboardGraphics
-                image={GCS_ICON}
-                width={64}
-                height={93}
-                verticalOrigin={VerticalOrigin.BOTTOM}
-                heightReference={HeightReference.CLAMP_TO_GROUND}
+            {/* GCS + RADAR (collocated · same physical pad). Outer ring +
+                center dot + label, three entities sharing one position so
+                Resium doesn't clobber duplicate graphics types. Radar pulse
+                still emanates from this position via <RadarScanPulse>. */}
+            <Entity name="GCS-RADAR-ring" position={Cartesian3.fromDegrees(INCHEON.u10_lon, INCHEON.u10_lat, 0)}>
+              <EllipseGraphics
+                semiMajorAxis={28}
+                semiMinorAxis={28}
+                height={0}
+                material={Color.fromCssColorString('#5fb6ff').withAlpha(0.18)}
+                outline
+                outlineColor={Color.fromCssColorString('#5fb6ff').withAlpha(0.9)}
+                outlineWidth={2}
+              />
+            </Entity>
+            <Entity name="GCS-RADAR-dot" position={Cartesian3.fromDegrees(INCHEON.u10_lon, INCHEON.u10_lat, 0)}>
+              <EllipseGraphics
+                semiMajorAxis={4}
+                semiMinorAxis={4}
+                height={0}
+                material={Color.fromCssColorString('#5fb6ff')}
               />
               <LabelGraphics
-                text="GCS · BASE"
+                text="GCS · RADAR"
                 font='bold 13px "Montserrat"'
                 fillColor={Color.fromCssColorString('#5fb6ff')}
                 outlineColor={Color.BLACK}
                 outlineWidth={3}
                 style={LabelStyle.FILL_AND_OUTLINE}
-                pixelOffset={new Cartesian2(72, -90)}
+                pixelOffset={new Cartesian2(70, -28)}
                 showBackground
                 backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.85)')}
                 heightReference={HeightReference.CLAMP_TO_GROUND}
               />
             </Entity>
 
-            {/* VIP */}
-            <Entity name="VIP" position={Cartesian3.fromDegrees(INCHEON.vip_lon, INCHEON.vip_lat, 0)}>
-              <BillboardGraphics
-                image={VIP_ICON}
-                width={72}
-                height={104}
-                verticalOrigin={VerticalOrigin.BOTTOM}
-                heightReference={HeightReference.CLAMP_TO_GROUND}
+            {/* VIP · ground installation, ring-on-the-map idiom */}
+            <Entity name="VIP-ring" position={Cartesian3.fromDegrees(INCHEON.vip_lon, INCHEON.vip_lat, 0)}>
+              <EllipseGraphics
+                semiMajorAxis={32}
+                semiMinorAxis={32}
+                height={0}
+                material={Color.fromCssColorString('#00FFBC').withAlpha(0.20)}
+                outline
+                outlineColor={Color.fromCssColorString('#00FFBC').withAlpha(0.95)}
+                outlineWidth={2}
+              />
+            </Entity>
+            <Entity name="VIP-dot" position={Cartesian3.fromDegrees(INCHEON.vip_lon, INCHEON.vip_lat, 0)}>
+              <EllipseGraphics
+                semiMajorAxis={5}
+                semiMinorAxis={5}
+                height={0}
+                material={Color.fromCssColorString('#00FFBC')}
               />
               <LabelGraphics
                 text="VIP · PROTECTED"
@@ -718,40 +788,43 @@ export default function App() {
                 outlineColor={Color.BLACK}
                 outlineWidth={3}
                 style={LabelStyle.FILL_AND_OUTLINE}
-                pixelOffset={new Cartesian2(-78, -100)}
+                pixelOffset={new Cartesian2(-78, -28)}
                 showBackground
                 backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.85)')}
                 heightReference={HeightReference.CLAMP_TO_GROUND}
               />
             </Entity>
 
-            {/* Radar — collocated with GCS base */}
+            {/* MC-01 · multicopter overwatch + altitude leader (45m) */}
+            <Entity name="MC-01-leader">
+              <PolylineGraphics
+                positions={[
+                  Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 45),
+                  Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 0),
+                ]}
+                width={1.5}
+                material={
+                  new PolylineDashMaterialProperty({
+                    color: Color.fromCssColorString('#9b6bff').withAlpha(0.55),
+                    dashLength: 12,
+                  })
+                }
+              />
+            </Entity>
             <Entity
-              name="RADAR"
-              position={Cartesian3.fromDegrees(INCHEON.u10_lon - 0.0003, INCHEON.u10_lat + 0.0002, 0)}
+              name="MC-01-ground-tick"
+              position={Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 0)}
             >
-              <BillboardGraphics
-                image={RADAR_ICON}
-                width={56}
-                height={81}
-                verticalOrigin={VerticalOrigin.BOTTOM}
-                heightReference={HeightReference.CLAMP_TO_GROUND}
-              />
-              <LabelGraphics
-                text="RADAR"
-                font='bold 13px "Montserrat"'
-                fillColor={Color.fromCssColorString('#5fb6ff')}
-                outlineColor={Color.BLACK}
-                outlineWidth={3}
-                style={LabelStyle.FILL_AND_OUTLINE}
-                pixelOffset={new Cartesian2(70, -50)}
-                showBackground
-                backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.85)')}
-                heightReference={HeightReference.CLAMP_TO_GROUND}
+              <EllipseGraphics
+                semiMajorAxis={6}
+                semiMinorAxis={6}
+                height={0}
+                material={Color.fromCssColorString('#9b6bff').withAlpha(0.18)}
+                outline
+                outlineColor={Color.fromCssColorString('#9b6bff').withAlpha(0.7)}
+                outlineWidth={1}
               />
             </Entity>
-
-            {/* MC-01 · multicopter overwatch */}
             <Entity name="MC-01" position={Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 45)}>
               <BillboardGraphics
                 image={MC_ICON}
@@ -1089,20 +1162,41 @@ export default function App() {
               />
             </Entity>
 
-            {/* Capture marker — pre-mounted */}
+            {/* Ground impact ring · expanding dust ring at the moment the
+                drone hits ground. Riding the threat's ground projection so
+                it lands exactly under wherever the drone fell. */}
+            <Entity
+              name="ground-impact"
+              position={threatGroundTickPosition as unknown as Cartesian3}
+              show={!!track && (phase === 'capture' || phase === 'report')}
+            >
+              <EllipseGraphics
+                semiMajorAxis={groundImpactRadius as unknown as number}
+                semiMinorAxis={groundImpactRadius as unknown as number}
+                material={groundImpactMaterial}
+                height={0}
+                outline
+                outlineColor={groundImpactOutline as unknown as Color}
+                outlineWidth={1.5}
+              />
+            </Entity>
+
+            {/* Capture marker · NEUTRALIZED label sits at the threat's
+                ground projection (= where the drone actually came to rest)
+                rather than the predicted capture point's air altitude. */}
             <Entity
               name="CAPTURE-PT"
-              position={capturePos ?? PLACEHOLDER_CAPTURE}
-              show={!!capturePos && (phase === 'capture' || phase === 'report')}
+              position={threatGroundTickPosition as unknown as Cartesian3}
+              show={!!track && (phase === 'capture' || phase === 'report')}
             >
               <BillboardGraphics
                 image={CAPTURE_ICON}
                 width={42}
                 height={42}
-                heightReference={HeightReference.RELATIVE_TO_GROUND}
+                heightReference={HeightReference.CLAMP_TO_GROUND}
               />
               <LabelGraphics
-                text="✓ NEUTRALIZED"
+                text={phase === 'report' ? '✕ DEBRIS · DOWNED' : '✓ NEUTRALIZED'}
                 font='11px "Montserrat"'
                 fillColor={Color.fromCssColorString('#00e87a')}
                 outlineColor={Color.BLACK}
