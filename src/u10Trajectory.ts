@@ -175,18 +175,20 @@ export function launchPathBezier(capture: LL, steps = 32): LL[] {
 // ── 3D extensions (lat, lon, altitude_m_agl) ──────────────────
 // Used by the Cesium variant. AB-U10 is a tilt-duct VTOL — the flight
 // profile reflects that:
-//   STANDBY/DETECT/CONFIRM/APPROVE  → 12m  (pad height, ducts down)
+//   STANDBY/DETECT/CONFIRM/APPROVE  → 0m   (on the pad, ducts down)
 //   LAUNCH (4 stages over 11s):
-//     0–25%  · vertical takeoff 12 → 60m, ducts rotating fwd
-//     25–55% · climb-out 60 → 95m, level acceleration begins
-//     55–85% · level cruise at 95m, transit to swing point
+//     0–25%  · vertical takeoff 0 → 50m, ducts rotating fwd
+//     25–55% · climb-out 50 → 85m, level acceleration begins
+//     55–85% · level cruise at 85m, transit to swing point
 //     85–100%· level turn into the threat's 6-o'clock (no altitude change)
-//   CAPTURE                         → 95m (level engagement window)
-//   REPORT                          → 95 → 12m, ease-in descent (RTB)
+//   CAPTURE                         → 85m (level engagement, MATCHES THREAT
+//                                          ALT so 6-o'clock chase reads as
+//                                          "same horizontal line, just behind")
+//   REPORT                          → 85 → 0m, ease-in descent (RTB)
 export type LLA = [number, number, number]
-const STANDBY_ALT = 12
-const CRUISE_ALT = 95
-const VTOL_TOP = 60                      // alt at end of vertical climb stage
+const STANDBY_ALT = 0
+const CRUISE_ALT = 85
+const VTOL_TOP = 50                      // alt at end of vertical climb stage
 
 const LAUNCH_VTOL_END = 0.25            // u of launch progress
 const LAUNCH_CLIMBOUT_END = 0.55

@@ -839,7 +839,7 @@ export default function App() {
                 image={MC_ICON}
                 width={56}
                 height={81}
-                verticalOrigin={VerticalOrigin.BOTTOM}
+                verticalOrigin={VerticalOrigin.CENTER}
                 heightReference={HeightReference.RELATIVE_TO_GROUND}
               />
               <LabelGraphics
@@ -953,7 +953,7 @@ export default function App() {
                 image={FPV_ICON}
                 width={64}
                 height={93}
-                verticalOrigin={VerticalOrigin.BOTTOM}
+                verticalOrigin={VerticalOrigin.CENTER}
                 heightReference={HeightReference.RELATIVE_TO_GROUND}
                 color={hostileBillboardColor as unknown as Color}
               />
