@@ -23,6 +23,7 @@ import {
   Ion,
   LabelStyle,
   Math as CesiumMath,
+  PolylineDashMaterialProperty,
   Transforms,
   VerticalOrigin,
   type Property,
@@ -527,6 +528,81 @@ export default function App() {
     [],
   )
 
+  // ── Altitude leader lines ─────────────────────────────────────
+  // Vertical dashed line from each airborne entity straight down to the
+  // ground. Without these, a top-down view collapses every "in flight"
+  // marker onto its ground footprint and the altitude separation becomes
+  // invisible. With them, the eye reads "object floating at altitude" the
+  // same way a tactical map does — height pole + ground tick.
+  const u10LeaderProperty = useMemo(
+    () =>
+      new CallbackProperty(() => {
+        const lla = u10Position3D(telRef.current)
+        return [
+          Cartesian3.fromDegrees(lla[1], lla[0], lla[2]),
+          Cartesian3.fromDegrees(lla[1], lla[0], 0),
+        ]
+      }, false),
+    [],
+  )
+
+  const threatLeaderProperty = useMemo(
+    () =>
+      new CallbackProperty(() => {
+        const tt = telRef.current
+        const trkId = tt.kill_chain.target_track_id
+        const trk = trkId ? tt.tracks[trkId] : null
+        if (!trk) return PLACEHOLDER_TRAIL
+        return [
+          Cartesian3.fromDegrees(trk.lon_deg, trk.lat_deg, trk.alt_m_agl),
+          Cartesian3.fromDegrees(trk.lon_deg, trk.lat_deg, 0),
+        ]
+      }, false),
+    [PLACEHOLDER_TRAIL],
+  )
+
+  // Dashed materials · pre-built once. Color is mode-agnostic (matches the
+  // entity's own colour family) so the leader reads as a quiet attribute
+  // of the entity, not a separate flag.
+  const u10LeaderMaterial = useMemo(
+    () =>
+      new PolylineDashMaterialProperty({
+        color: Color.fromCssColorString('#00FFBC').withAlpha(0.55),
+        dashLength: 12,
+      }),
+    [],
+  )
+  const threatLeaderMaterial = useMemo(
+    () =>
+      new PolylineDashMaterialProperty({
+        color: Color.fromCssColorString('#ff3d55').withAlpha(0.55),
+        dashLength: 12,
+      }),
+    [],
+  )
+
+  // Ground tick (small ring at the foot of the leader) — gives the eye
+  // a "this is the ground point under the airborne object" anchor.
+  const u10GroundTickPosition = useMemo(
+    () =>
+      new CallbackPositionProperty(() => {
+        const lla = u10Position3D(telRef.current)
+        return Cartesian3.fromDegrees(lla[1], lla[0], 0)
+      }, false),
+    [],
+  )
+  const threatGroundTickPosition = useMemo(
+    () =>
+      new CallbackPositionProperty(() => {
+        const tt = telRef.current
+        const trkId = tt.kill_chain.target_track_id
+        const trk = trkId ? tt.tracks[trkId] : null
+        if (!trk) return PLACEHOLDER_POS
+        return Cartesian3.fromDegrees(trk.lon_deg, trk.lat_deg, 0)
+      }, false),
+    [PLACEHOLDER_POS],
+  )
+
   // ── Pre-fire trail ────────────────────────────────────────────
   // Brief polyline AB-U10 → threat during the engagement instant
   // (last ~0.5s of launch + first ~0.5s of capture). Reads as the
@@ -697,6 +773,34 @@ export default function App() {
               />
             </Entity>
 
+            {/* AB-U10 altitude leader · dashed pole from airframe to ground +
+                ring tick at the ground point. Hidden while idle on the pad. */}
+            <Entity
+              name="AB-U10-leader"
+              show={phase === 'launch' || phase === 'capture' || phase === 'report'}
+            >
+              <PolylineGraphics
+                positions={u10LeaderProperty as unknown as Cartesian3[]}
+                width={1.5}
+                material={u10LeaderMaterial}
+              />
+            </Entity>
+            <Entity
+              name="AB-U10-ground-tick"
+              position={u10GroundTickPosition as unknown as Cartesian3}
+              show={phase === 'launch' || phase === 'capture' || phase === 'report'}
+            >
+              <EllipseGraphics
+                semiMajorAxis={6}
+                semiMinorAxis={6}
+                height={0}
+                material={Color.fromCssColorString('#00FFBC').withAlpha(0.18)}
+                outline
+                outlineColor={Color.fromCssColorString('#00FFBC').withAlpha(0.7)}
+                outlineWidth={1}
+              />
+            </Entity>
+
             {/* AB-U10 · 3D GLB model + label · live position via CallbackProperty
                 so Cesium updates 60fps regardless of React tick rate. */}
             <Entity
@@ -729,6 +833,32 @@ export default function App() {
 
             {/* Keep U10_ICON billboard import alive (not rendered while model is in use) */}
             {false && <BillboardGraphics image={U10_ICON} />}
+
+            {/* Hostile altitude leader · dashed pole + ground tick. Same
+                visual grammar as AB-U10's so the eye can compare altitudes
+                across the engagement (drone falls → its pole shrinks). */}
+            <Entity name="HOSTILE-leader" show={!!track}>
+              <PolylineGraphics
+                positions={threatLeaderProperty as unknown as Cartesian3[]}
+                width={1.5}
+                material={threatLeaderMaterial}
+              />
+            </Entity>
+            <Entity
+              name="HOSTILE-ground-tick"
+              position={threatGroundTickPosition as unknown as Cartesian3}
+              show={!!track}
+            >
+              <EllipseGraphics
+                semiMajorAxis={6}
+                semiMinorAxis={6}
+                height={0}
+                material={Color.fromCssColorString('#ff3d55').withAlpha(0.18)}
+                outline
+                outlineColor={Color.fromCssColorString('#ff3d55').withAlpha(0.7)}
+                outlineWidth={1}
+              />
+            </Entity>
 
             {/* Hostile FPV — pre-mounted; show toggles on track presence.
                 Billboard color is dynamic so SHOTGUN can fade it out post-blast. */}
