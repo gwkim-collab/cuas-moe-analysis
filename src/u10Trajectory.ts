@@ -33,6 +33,23 @@ function swingPoint(capture: LL): LL {
   return [capture[0] + SWING_OFFSET_LAT, capture[1] + SWING_OFFSET_LON]
 }
 
+// 6 o'clock approach offset — AB-U10 ends launch ~50m NW (drone's 6 o'clock,
+// since threat course is ~130° SE so its 6 vector is ~310° NW). This way
+// AB-U10 sits behind the drone at engagement instead of co-located with it,
+// so the main-map view reads as "tail chase + shot" rather than "stack on top."
+// 0.00045° lat ≈ 50m N · 0.00045° lon ≈ 40m W → bearing ~322° (close enough to 310°).
+const APPROACH_OFFSET_LAT = 0.00045
+const APPROACH_OFFSET_LON = -0.00045
+
+function approachPoint(capture: LL): LL {
+  return [capture[0] + APPROACH_OFFSET_LAT, capture[1] + APPROACH_OFFSET_LON]
+}
+
+// During CAPTURE phase, AB-U10 holds at the 6-o'clock approach point for a
+// short engagement window (firing the payload, neutralization moment) before
+// starting RTB. This is what makes the kill visible in the main-map view.
+const CAPTURE_HOLD_MS = 2_000
+
 function bezier2(p0: LL, p1: LL, p2: LL, t: number): LL {
   const a = (1 - t) * (1 - t)
   const b = 2 * (1 - t) * t
@@ -57,17 +74,28 @@ export function u10Position(tel: CUASTelemetry): LL {
   }
 
   const capture: LL = [sol.capture_lat_deg, sol.capture_lon_deg]
+  const approach = approachPoint(capture)
 
   if (phase === 'launch') {
+    // Bezier ends at the 6-o'clock approach point, NOT the capture (drone's)
+    // point. So at launch end AB-U10 is sitting ~50m behind the threat,
+    // looking down its tail.
     const u = Math.min(1, Math.max(0, (tel.scenario_clock_ms - LAUNCH_T0_MS) / LAUNCH_DURATION_MS))
-    return bezier2(standby, swingPoint(capture), capture, u)
+    return bezier2(standby, swingPoint(capture), approach, u)
   }
 
-  // capture/report — straight RTB
-  const u = Math.min(1, Math.max(0, (tel.scenario_clock_ms - CAPTURE_T0_MS) / RTB_DURATION_MS))
+  // capture: hold at the 6 o'clock for the engagement window (CAPTURE_HOLD_MS),
+  //          then start RTB toward the standby pad.
+  // report:  continue RTB from wherever we were when capture ended.
+  const captureT = tel.scenario_clock_ms - CAPTURE_T0_MS
+  if (captureT < CAPTURE_HOLD_MS) return approach
+  const u = Math.min(
+    1,
+    Math.max(0, (captureT - CAPTURE_HOLD_MS) / (RTB_DURATION_MS - CAPTURE_HOLD_MS)),
+  )
   return [
-    capture[0] + (standby[0] - capture[0]) * u,
-    capture[1] + (standby[1] - capture[1]) * u,
+    approach[0] + (standby[0] - approach[0]) * u,
+    approach[1] + (standby[1] - approach[1]) * u,
   ]
 }
 
@@ -85,20 +113,33 @@ export function u10HeadingDeg(tel: CUASTelemetry): number {
     return 90 // sit facing east on the pad
   }
   const capture: LL = [sol.capture_lat_deg, sol.capture_lon_deg]
+  const approach = approachPoint(capture)
   const swing = swingPoint(capture)
 
   let dLat: number, dLon: number
   if (phase === 'launch') {
     const u = Math.min(1, Math.max(0, (tel.scenario_clock_ms - LAUNCH_T0_MS) / LAUNCH_DURATION_MS))
-    // bezier'(t) = 2(1-t)(P1-P0) + 2t(P2-P1)
+    // bezier'(t) = 2(1-t)(P1-P0) + 2t(P2-P1) — endpoint is the approach
+    // point, so the final tangent points from swing → approach (NW→SE).
     const a = 2 * (1 - u)
     const b = 2 * u
-    dLat = a * (swing[0] - standby[0]) + b * (capture[0] - swing[0])
-    dLon = a * (swing[1] - standby[1]) + b * (capture[1] - swing[1])
+    dLat = a * (swing[0] - standby[0]) + b * (approach[0] - swing[0])
+    dLon = a * (swing[1] - standby[1]) + b * (approach[1] - swing[1])
+  } else if (phase === 'capture') {
+    const captureT = tel.scenario_clock_ms - CAPTURE_T0_MS
+    if (captureT < CAPTURE_HOLD_MS) {
+      // engagement hold — face the threat (drone is at capture point,
+      // we're at approach 6-o'clock, so heading is approach → capture, ~SE).
+      dLat = capture[0] - approach[0]
+      dLon = capture[1] - approach[1]
+    } else {
+      dLat = standby[0] - approach[0]
+      dLon = standby[1] - approach[1]
+    }
   } else {
-    // capture / report — heading back to base (RTB)
-    dLat = standby[0] - capture[0]
-    dLon = standby[1] - capture[1]
+    // report — continue RTB from approach point back to standby
+    dLat = standby[0] - approach[0]
+    dLon = standby[1] - approach[1]
   }
   const bearing = (Math.atan2(dLon, dLat) * 180) / Math.PI
   return (bearing + 360) % 360
@@ -111,9 +152,10 @@ export function u10HeadingDeg(tel: CUASTelemetry): number {
 export function launchPathBezier(capture: LL, steps = 32): LL[] {
   const standby: LL = [INCHEON.u10_lat, INCHEON.u10_lon]
   const swing = swingPoint(capture)
+  const approach = approachPoint(capture)
   const pts: LL[] = []
   for (let i = 0; i <= steps; i++) {
-    pts.push(bezier2(standby, swing, capture, i / steps))
+    pts.push(bezier2(standby, swing, approach, i / steps))
   }
   return pts
 }

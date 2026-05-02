@@ -15,6 +15,7 @@ import {
   Cartesian2,
   Cartesian3,
   Color,
+  ColorMaterialProperty,
   HeadingPitchRoll,
   HeightReference,
   Ion,
@@ -26,7 +27,7 @@ import {
 } from 'cesium'
 
 import { initialState, INCHEON } from './mockData'
-import { operatorApprove, operatorDismiss, SCENARIO_TOTAL_MS, tick } from './scenario'
+import { operatorApprove, operatorDismiss, PHASE_SCHEDULE, SCENARIO_TOTAL_MS, tick } from './scenario'
 import { launchPathBezier3D, u10HeadingDeg, u10Position3D } from './u10Trajectory'
 import type { CUASTelemetry, KillChainPhase, PayloadMode, ScenarioMode } from './types'
 import {
@@ -409,6 +410,96 @@ export default function App() {
     return Cartesian3.fromDegrees(sol.capture_lon_deg, sol.capture_lat_deg, sol.capture_alt_m_agl)
   }, [sol?.capture_lon_deg, sol?.capture_lat_deg, sol?.capture_alt_m_agl])
 
+  // ── Engagement effect (capture phase) ─────────────────────────
+  // Visible for 1.5s after capture phase begins. Net gun: tighter, slower
+  // expanding amber ring (the "net" is small, ground-footprint-y). Shotgun:
+  // wider, faster expanding orange ring (explosion). Both fade out at 1.5s.
+  const ENGAGEMENT_DURATION_MS = 1500
+  const NET_COLOR = '#ffb020'
+  const SHOT_COLOR = '#ff7a3d'
+
+  const engagementRadius = useMemo(
+    () =>
+      new CallbackProperty(() => {
+        const tt = telRef.current
+        if (tt.kill_chain.phase !== 'capture') return 0.001
+        const captureT = tt.scenario_clock_ms - PHASE_SCHEDULE.capture
+        if (captureT <= 0 || captureT > ENGAGEMENT_DURATION_MS) return 0.001
+        // NET: peaks ~25m ground footprint. SHOT: peaks ~70m blast radius.
+        const peak = tt.payload_mode === 'net_gun' ? 25 : 70
+        const u = captureT / ENGAGEMENT_DURATION_MS
+        // ease-out · radius grows fast then settles
+        return Math.max(0.001, peak * (1 - Math.pow(1 - u, 3)))
+      }, false),
+    [],
+  )
+
+  const engagementMaterial = useMemo(
+    () =>
+      new ColorMaterialProperty(
+        new CallbackProperty(() => {
+          const tt = telRef.current
+          const captureT = tt.scenario_clock_ms - PHASE_SCHEDULE.capture
+          const opacity = Math.max(0, 1 - captureT / ENGAGEMENT_DURATION_MS)
+          const color = tt.payload_mode === 'net_gun' ? NET_COLOR : SHOT_COLOR
+          // SHOT has a brighter fill (explosion); NET is more transparent (mesh).
+          const fillScale = tt.payload_mode === 'net_gun' ? 0.22 : 0.45
+          return Color.fromCssColorString(color).withAlpha(opacity * fillScale)
+        }, false),
+      ),
+    [],
+  )
+
+  const engagementOutlineColor = useMemo(
+    () =>
+      new CallbackProperty(() => {
+        const tt = telRef.current
+        const captureT = tt.scenario_clock_ms - PHASE_SCHEDULE.capture
+        const opacity = Math.max(0, 1 - captureT / ENGAGEMENT_DURATION_MS)
+        const color = tt.payload_mode === 'net_gun' ? NET_COLOR : SHOT_COLOR
+        return Color.fromCssColorString(color).withAlpha(opacity)
+      }, false),
+    [],
+  )
+
+  // ── Pre-fire trail ────────────────────────────────────────────
+  // Brief polyline AB-U10 → threat during the engagement instant
+  // (last ~0.5s of launch + first ~0.5s of capture). Reads as the
+  // payload's flight path between the two airframes.
+  const fireTrailProperty = useMemo(
+    () =>
+      new CallbackProperty(() => {
+        const tt = telRef.current
+        const phase = tt.kill_chain.phase
+        const ms = tt.scenario_clock_ms
+        const inWindow =
+          (phase === 'launch' && ms >= PHASE_SCHEDULE.capture - 500) ||
+          (phase === 'capture' && ms <= PHASE_SCHEDULE.capture + 500)
+        if (!inWindow) return PLACEHOLDER_TRAIL
+        const trkId = tt.kill_chain.target_track_id
+        const trk = trkId ? tt.tracks[trkId] : null
+        if (!trk) return PLACEHOLDER_TRAIL
+        const lla = u10Position3D(tt)
+        return [
+          Cartesian3.fromDegrees(lla[1], lla[0], lla[2]),
+          Cartesian3.fromDegrees(trk.lon_deg, trk.lat_deg, trk.alt_m_agl),
+        ]
+      }, false),
+    [PLACEHOLDER_TRAIL],
+  )
+
+  const fireTrailMaterial = useMemo(
+    () =>
+      new ColorMaterialProperty(
+        new CallbackProperty(() => {
+          const tt = telRef.current
+          const color = tt.payload_mode === 'net_gun' ? NET_COLOR : SHOT_COLOR
+          return Color.fromCssColorString(color).withAlpha(0.95)
+        }, false),
+      ),
+    [],
+  )
+
   // Display values for HUD labels — derived at React tick rate (fine)
   const u10AltDisplay = u10Position3D(tel)[2]
 
@@ -680,6 +771,64 @@ export default function App() {
                 pixelOffset={new Cartesian2(0, 0)}
                 showBackground
                 backgroundColor={Color.fromCssColorString('rgba(7,9,13,0.8)')}
+              />
+            </Entity>
+
+            {/* Engagement effect · NET / SHOTGUN expanding ring at the
+                threat's position the moment AB-U10 fires.
+                  - net_gun  : amber (#ffb020), tighter, slower expansion (~25m peak)
+                  - shotgun  : orange (#ff7a3d), wider, faster expansion (~70m peak)
+                Fades out over 1.5s. Pre-mounted; show toggles on capture phase. */}
+            {/* Ground footprint ring · payload-coloured, expanding+fading.
+                Drawn at h=0 so it reads from the top-down camera. */}
+            <Entity
+              name="engagement-effect-ground"
+              position={
+                sol
+                  ? Cartesian3.fromDegrees(sol.capture_lon_deg, sol.capture_lat_deg, 0)
+                  : PLACEHOLDER_CAPTURE
+              }
+              show={!!sol && phase === 'capture'}
+            >
+              <EllipseGraphics
+                semiMajorAxis={engagementRadius as unknown as number}
+                semiMinorAxis={engagementRadius as unknown as number}
+                material={engagementMaterial}
+                height={0}
+                outline
+                outlineColor={engagementOutlineColor as unknown as Color}
+                outlineWidth={tel.payload_mode === 'net_gun' ? 2 : 4}
+              />
+            </Entity>
+
+            {/* Mid-air burst ring · same color, drawn at the threat altitude
+                so the explosion/net cloud is visible from the side too. */}
+            <Entity
+              name="engagement-effect-air"
+              position={
+                sol
+                  ? Cartesian3.fromDegrees(sol.capture_lon_deg, sol.capture_lat_deg, sol.capture_alt_m_agl)
+                  : PLACEHOLDER_CAPTURE
+              }
+              show={!!sol && phase === 'capture'}
+            >
+              <EllipseGraphics
+                semiMajorAxis={engagementRadius as unknown as number}
+                semiMinorAxis={engagementRadius as unknown as number}
+                material={engagementMaterial}
+                outline
+                outlineColor={engagementOutlineColor as unknown as Color}
+                outlineWidth={tel.payload_mode === 'net_gun' ? 2 : 4}
+              />
+            </Entity>
+
+            {/* Pre-fire trail · short polyline AB-U10 → threat, last 0.5s of
+                launch + first 0.5s of capture. Reads as the payload in flight. */}
+            <Entity name="fire-trail" show={phase === 'launch' || phase === 'capture'}>
+              <PolylineGraphics
+                positions={fireTrailProperty as unknown as Cartesian3[]}
+                width={tel.payload_mode === 'net_gun' ? 2.5 : 4}
+                material={fireTrailMaterial}
               />
             </Entity>
 

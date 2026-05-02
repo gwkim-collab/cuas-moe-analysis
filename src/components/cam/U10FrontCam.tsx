@@ -1,4 +1,5 @@
 import type { CUASTelemetry } from '../../types'
+import { PHASE_SCHEDULE } from '../../scenario'
 
 interface Props { tel: CUASTelemetry }
 
@@ -100,6 +101,32 @@ export default function U10FrontCam({ tel }: Props) {
   // Airframe shake during launch (vibration cue).
   const shakeClass = phase === 'launch' ? 'u10-shake' : ''
 
+  // ── Engagement instant · NET / EXPLOSION overlays ────────────
+  // Both run for ~1.5s after capture begins. Net gun: a mesh square
+  // expanding from 0 → 110px around the AI tracker box. Shotgun: a
+  // bright flash + radial scatter centered on the box.
+  const engageProgress =
+    phase === 'capture'
+      ? Math.min(1, Math.max(0, (tel.scenario_clock_ms - PHASE_SCHEDULE.capture) / 1500))
+      : 0
+  const showEngage = phase === 'capture' && engageProgress > 0 && engageProgress < 1
+
+  // ease-out-cubic so the effect grows fast then settles
+  const eU = 1 - Math.pow(1 - engageProgress, 3)
+  // opacity: ramps in 0..0.15, holds, then fades out from 0.6..1.0
+  const engageOpacity =
+    engageProgress < 0.15
+      ? engageProgress / 0.15
+      : engageProgress > 0.6
+        ? Math.max(0, 1 - (engageProgress - 0.6) / 0.4)
+        : 1
+
+  const isNet = tel.payload_mode === 'net_gun'
+  const NET_PEAK_PX = 110
+  const SHOT_PEAK_PX = 95
+  const netHalf = (NET_PEAK_PX / 2) * eU
+  const shotR = SHOT_PEAK_PX * eU
+
   return (
     <div className={`u10-cam-wrap ${shakeClass}`}>
       <svg className="u10-svg" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
@@ -118,20 +145,11 @@ export default function U10FrontCam({ tel }: Props) {
             reticle and AI box stay screen-fixed (rendered outside this g). */}
         <g transform={`rotate(${rollDeg} ${VB_W / 2} ${VB_H * 0.55}) translate(0 ${pitchDeg * 4})`}>
           <rect x={-VB_W} y={-VB_H} width={VB_W * 3} height={VB_H * 3} fill="url(#skyGrad)" />
-          {/* During engagement (capture/launch end) reveal a hint of the
-              netgun action photo through the synthetic horizon — gives
-              the lock moment a "real footage" feel. */}
-          {(phase === 'capture' || (phase === 'launch' && launchProgress > 0.6)) && (
-            <image
-              href="/brand/u10_action.jpg"
-              x={0}
-              y={VB_H * 0.25}
-              width={VB_W}
-              height={VB_H * 0.6}
-              preserveAspectRatio="xMidYMid slice"
-              opacity={phase === 'capture' ? 0.55 : (launchProgress - 0.6) * 1.2}
-            />
-          )}
+          {/* (the u10_action.jpg horizon-blend image was removed — it read as
+              a stray helicopter behind the synthetic horizon and broke the
+              "EO sensor feed" mental model. The cleaner SVG-only horizon plus
+              the engagement-instant overlays below make the moment more
+              legible than the photo blend ever did.) */}
           {/* horizon line */}
           <line x1={-VB_W} y1={VB_H * 0.55} x2={VB_W * 2} y2={VB_H * 0.55}
                 stroke="rgba(122,138,158,0.4)" strokeWidth="0.6" />
@@ -199,6 +217,74 @@ export default function U10FrontCam({ tel }: Props) {
             {/* small dot inside, simulating the drone's silhouette */}
             <circle cx={boxX} cy={boxY} r={Math.max(2, boxSize * 0.05)}
                     fill="#ff3d55" opacity="0.7" />
+          </g>
+        )}
+
+        {/* ── Engagement instant · NET (mesh deploy) ───────────── */}
+        {showEngage && isNet && (
+          <g opacity={engageOpacity}>
+            <defs>
+              <pattern id="netMesh" x="0" y="0" width="7" height="7" patternUnits="userSpaceOnUse">
+                <path d="M 7 0 L 0 0 0 7" fill="none"
+                      stroke="#ffb020" strokeWidth="0.7" opacity="0.9" />
+              </pattern>
+            </defs>
+            {/* mesh square deploying out from the AI box center */}
+            <rect
+              x={boxX - netHalf}
+              y={boxY - netHalf}
+              width={netHalf * 2}
+              height={netHalf * 2}
+              fill="url(#netMesh)"
+              stroke="#ffb020"
+              strokeWidth="1.4"
+            />
+            {/* corner cinches — the four weights at the net corners */}
+            {[-1, 1].flatMap((sx) =>
+              [-1, 1].map((sy) => (
+                <circle
+                  key={`${sx}${sy}`}
+                  cx={boxX + sx * netHalf}
+                  cy={boxY + sy * netHalf}
+                  r={2.2}
+                  fill="#ffb020"
+                />
+              )),
+            )}
+          </g>
+        )}
+
+        {/* ── Engagement instant · SHOT (explosion flash) ──────── */}
+        {showEngage && !isNet && (
+          <g opacity={engageOpacity}>
+            {/* outer blast ring */}
+            <circle
+              cx={boxX} cy={boxY} r={shotR}
+              fill="#ff7a3d" opacity="0.35"
+            />
+            {/* inner core */}
+            <circle
+              cx={boxX} cy={boxY} r={shotR * 0.45}
+              fill="#ffeec0" opacity={Math.max(0, 1 - engageProgress * 1.6)}
+            />
+            {/* radial shrapnel lines */}
+            {[0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => {
+              const rad = (deg * Math.PI) / 180
+              const inR = shotR * 0.5
+              const outR = shotR * 1.05
+              return (
+                <line
+                  key={i}
+                  x1={boxX + Math.cos(rad) * inR}
+                  y1={boxY + Math.sin(rad) * inR}
+                  x2={boxX + Math.cos(rad) * outR}
+                  y2={boxY + Math.sin(rad) * outR}
+                  stroke="#ff7a3d"
+                  strokeWidth="1.6"
+                  opacity="0.85"
+                />
+              )
+            })}
           </g>
         )}
 
