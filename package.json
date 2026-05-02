@@ -1,0 +1,27 @@
+{
+  "name": "cuas-gcs-mockup-cesium",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Airbility C-UAS GCS — 3D variant on Cesium for Yeouido scenario",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "cesium": "^1.121.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "resium": "^1.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "~5.6.3",
+    "vite": "^8.0.9",
+    "vite-plugin-cesium": "^1.2.22"
+  }
+}

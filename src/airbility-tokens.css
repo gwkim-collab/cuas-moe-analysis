@@ -1,0 +1,306 @@
+/* ============================================================
+   AIRBILITY — Colors & Type
+   ------------------------------------------------------------
+   Brand: AIRBILITY — High-speed eVTOL aircraft (Vectored Thrust)
+   Vision: "Above and Boundless"
+   Tone:   futuristic, technical, precise, boundless
+   ============================================================ */
+
+/* ---------- FONTS ---------- */
+@font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat-Thin.ttf")       format("truetype"); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat-ExtraLight.ttf") format("truetype"); font-weight: 200; font-style: normal; font-display: swap; }
+@font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat-Light.ttf")      format("truetype"); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat-Regular.ttf")    format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat-Medium.ttf")     format("truetype"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat-SemiBold.ttf")   format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat-Bold.ttf")       format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat-ExtraBold.ttf")  format("truetype"); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Montserrat"; src: url("/fonts/Montserrat-Black.ttf")      format("truetype"); font-weight: 900; font-style: normal; font-display: swap; }
+
+@font-face { font-family: "Pretendard"; src: url("/fonts/Pretendard-Thin.otf")       format("opentype"); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: "Pretendard"; src: url("/fonts/Pretendard-ExtraLight.otf") format("opentype"); font-weight: 200; font-style: normal; font-display: swap; }
+@font-face { font-family: "Pretendard"; src: url("/fonts/Pretendard-Light.otf")      format("opentype"); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: "Pretendard"; src: url("/fonts/Pretendard-Regular.otf")    format("opentype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Pretendard"; src: url("/fonts/Pretendard-Medium.otf")     format("opentype"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Pretendard"; src: url("/fonts/Pretendard-SemiBold.otf")   format("opentype"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Pretendard"; src: url("/fonts/Pretendard-Bold.otf")       format("opentype"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Pretendard"; src: url("/fonts/Pretendard-ExtraBold.otf")  format("opentype"); font-weight: 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Pretendard"; src: url("/fonts/Pretendard-Black.otf")      format("opentype"); font-weight: 900; font-style: normal; font-display: swap; }
+
+:root {
+  /* ============================================================
+     BRAND COLORS — PRIMITIVE
+     ------------------------------------------------------------
+     "Olo" mint is the signature accent. Use SPARINGLY on dark
+     backgrounds. It should feel like light in the sky, not paint.
+     ============================================================ */
+  --olo:                 #00FFBC;   /* Primary — Olo mint  (R0   G255 B188) — 2025+ refresh */
+  --olo-rgb:             0 255 188;
+  --airbility-teal:      #1DE9B6;   /* Legacy primary from 2024 CI guide (R29 G233 B182) */
+  --airbility-teal-dark: #009788;   /* Secondary teal */
+  --airbility-light-grey:#E9E9E7;
+  --airbility-dark-grey: #808080;
+  --black:               #000000;
+  --white:               #FFFFFF;
+
+  /* Tinted neutrals derived from pure black for UI depth on dark surfaces */
+  --ink-900: #000000;
+  --ink-800: #0A0D0C;
+  --ink-700: #111514;
+  --ink-600: #161B19;
+  --ink-500: #1F2623;
+  --ink-400: #2A322E;
+  --ink-300: #3A433F;
+  --ink-200: #5B6763;
+  --ink-100: #8A938F;
+  --ink-050: #C8CECC;
+
+  /* Olo tints for hover / selection states */
+  --olo-95: rgba(0, 255, 188, 0.95);
+  --olo-60: rgba(0, 255, 188, 0.60);
+  --olo-30: rgba(0, 255, 188, 0.30);
+  --olo-12: rgba(0, 255, 188, 0.12);
+  --olo-06: rgba(0, 255, 188, 0.06);
+
+  /* ============================================================
+     SEMANTIC COLORS
+     ============================================================ */
+  --bg:            var(--black);        /* App background — default dark */
+  --bg-elevated:   var(--ink-800);      /* Cards, panels */
+  --bg-sunken:     #050706;             /* Below-content wells */
+  --bg-inverse:    var(--white);        /* Light surfaces (docs, reports) */
+
+  --fg:            var(--white);        /* Primary text on dark */
+  --fg-muted:      #B5BCB9;             /* Secondary text on dark */
+  --fg-subtle:     #6E7773;             /* Captions, meta */
+  --fg-inverse:    var(--black);        /* Text on light surface */
+
+  --accent:        var(--olo);          /* CTAs, live data, focus */
+  --accent-hover:  #33FFCA;             /* Slightly lifted on hover */
+  --accent-press:  #00D19A;             /* Pressed */
+  --accent-soft:   var(--olo-12);       /* Accent-tinted surface */
+
+  --border:        rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --border-accent: var(--olo);
+
+  --success:       var(--olo);
+  /* No amber / red / sky semantic colors — brand restricts to Olo + neutrals. */
+
+  /* ============================================================
+     TYPE — FAMILIES
+     ------------------------------------------------------------
+     Montserrat = brand/wordmark, English headlines, Slogan
+     Pretendard = Korean + English body text (dual-script safe)
+     ============================================================ */
+  --font-display:  "Montserrat", "Pretendard", ui-sans-serif, system-ui, sans-serif;
+  --font-body:     "Pretendard", "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:     ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* ============================================================
+     TYPE — SCALE
+     ------------------------------------------------------------
+     Aerospace-precise, wide tracking on display sizes.
+     ============================================================ */
+  --fs-display-xl: clamp(56px, 8vw, 128px);
+  --fs-display-l:  clamp(44px, 6vw,  88px);
+  --fs-display-m:  clamp(36px, 4.5vw, 64px);
+  --fs-h1:         clamp(32px, 3.5vw, 48px);
+  --fs-h2:         clamp(24px, 2.5vw, 36px);
+  --fs-h3:         20px;
+  --fs-h4:         17px;
+  --fs-body:       15px;
+  --fs-small:      13px;
+  --fs-micro:      11px;    /* Labels, callouts */
+
+  --lh-tight:      1.04;
+  --lh-snug:       1.2;
+  --lh-normal:     1.5;
+  --lh-loose:      1.7;
+
+  --ls-hero:       -0.02em;    /* Montserrat display looks best slightly tight */
+  --ls-heading:    -0.01em;
+  --ls-body:       0em;
+  --ls-label:      0.08em;     /* UPPERCASE LABELS */
+  --ls-spec:       0.14em;     /* WIDE-TRACKED TECHNICAL LABELS — hallmark */
+
+  /* ============================================================
+     SPACING — 4px baseline
+     ============================================================ */
+  --s-0:  0;
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  20px;
+  --s-6:  24px;
+  --s-7:  32px;
+  --s-8:  40px;
+  --s-9:  56px;
+  --s-10: 72px;
+  --s-11: 96px;
+  --s-12: 128px;
+
+  /* ============================================================
+     RADIUS — sparing. Airbility leans on sharp geometry.
+     ============================================================ */
+  --r-0:  0;
+  --r-1:  2px;
+  --r-2:  4px;
+  --r-3:  8px;
+  --r-4:  12px;
+  --r-5:  16px;
+  --r-pill: 999px;
+
+  /* ============================================================
+     ELEVATION
+     ============================================================ */
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-2: 0 4px 16px rgba(0,0,0,0.5);
+  --shadow-3: 0 12px 40px rgba(0,0,0,0.6);
+  --glow-olo: 0 0 0 1px var(--olo), 0 0 24px rgba(0,255,188,0.35);
+  --glow-olo-soft: 0 0 32px rgba(0,255,188,0.25);
+
+  /* ============================================================
+     MOTION
+     ============================================================ */
+  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:    cubic-bezier(0.55, 0, 0.85, 0.1);
+  --ease-in-out:cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast:   120ms;
+  --dur-base:   220ms;
+  --dur-slow:   420ms;
+}
+
+/* ============================================================
+   SEMANTIC TYPE CLASSES
+   ============================================================ */
+.ab-slogan {
+  font-family: var(--font-display);
+  font-weight: 600;   /* Montserrat SemiBold per CI guide */
+  font-size: var(--fs-display-m);
+  letter-spacing: var(--ls-heading);
+  line-height: var(--lh-tight);
+  color: var(--fg);
+}
+.ab-hero {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-display-xl);
+  letter-spacing: var(--ls-hero);
+  line-height: var(--lh-tight);
+  text-transform: uppercase;
+}
+.ab-h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-h1);
+  letter-spacing: var(--ls-heading);
+  line-height: var(--lh-snug);
+}
+.ab-h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-h2);
+  letter-spacing: var(--ls-heading);
+  line-height: var(--lh-snug);
+}
+.ab-h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-h3);
+  letter-spacing: var(--ls-heading);
+  line-height: var(--lh-snug);
+}
+.ab-body {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--fs-body);
+  line-height: var(--lh-normal);
+  color: var(--fg-muted);
+}
+.ab-small {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--fs-small);
+  line-height: var(--lh-normal);
+  color: var(--fg-muted);
+}
+.ab-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.ab-spec {
+  /* Hallmark Airbility "technical readout" label — wide tracking, uppercase, tiny */
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--ls-spec);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.ab-metric-value {
+  /* Big number callouts used throughout product decks */
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-display-m);
+  letter-spacing: var(--ls-heading);
+  line-height: 1;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.ab-mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  letter-spacing: 0.02em;
+}
+
+/* ============================================================
+   COMPONENT-VARIABLE ALIASES
+   ------------------------------------------------------------
+   The C-UAS GCS components use legacy variable names from the
+   2D mockup. These aliases map them onto the brand tokens
+   above so we can drop the design system in without rewriting
+   every component.
+   ============================================================ */
+:root {
+  /* surfaces */
+  --surface:   var(--ink-800);
+  --surface2:  var(--ink-700);
+  --surface3:  var(--ink-600);
+
+  /* hairline borders per brand */
+  --border:    rgba(255, 255, 255, 0.10);
+  --border2:   rgba(255, 255, 255, 0.22);
+
+  /* brand accent — Olo */
+  --green:     var(--olo);
+  --green2:    var(--accent-hover);
+
+  /* functional exceptions for ops legibility (brand restricts to Olo +
+     neutrals; on a C-UAS console we keep red for HOSTILE, amber for
+     payload mode, blue/purple for friendly assets) */
+  --red:       #FF3D55;
+  --red2:      #CC2E42;
+  --amber:     #FFB020;
+  --blue:      #5FB6FF;
+  --blue2:     #1A6FD4;
+  --purple:    #9B6BFF;
+
+  /* text */
+  --text:      var(--fg);
+  --text2:     var(--fg-muted);
+  --text3:     var(--fg-subtle);
+
+  /* fonts — Airbility canonical pair */
+  --mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: var(--font-body);
+
+  /* canvas */
+  --canvas-w: 1920px;
+  --canvas-h: 1080px;
+}

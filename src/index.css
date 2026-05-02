@@ -1,0 +1,690 @@
+/* Cesium variant · only the overlay-specific styles live here.
+ * The full GCS chrome (TopBar/RightPanel/CameraStack/etc) is styled
+ * via App.css. Design tokens (Olo + Montserrat + Pretendard) come
+ * from airbility-tokens.css imported in main.tsx. */
+
+/* Fluid · fill the viewport. The .app-canvas itself is 100vw × 100vh;
+ * the inner main-grid keeps the side rails fixed and stretches Cesium
+ * across whatever's left. No transform scaling — Cesium renders at
+ * native resolution at every viewport size, so no softness. */
+html, body, #root {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  background: #000;
+  overflow: hidden;
+  font-family: var(--sans);
+}
+
+/* Cesium loading splash — drawn inside the map cell */
+.cesium-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, #0a1322, #02040a);
+  z-index: 50;
+  pointer-events: none;
+}
+.cesium-loading-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text2);
+  letter-spacing: 3px;
+  animation: cl-pulse 1.2s ease-in-out infinite;
+}
+@keyframes cl-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+/* Fly-to-VIP button · bottom-right of map cell */
+.cesium-fly-btn {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 200;
+  padding: 8px 14px;
+  background: rgba(0, 232, 122, 0.10);
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+  backdrop-filter: blur(4px);
+}
+.cesium-fly-btn:hover {
+  background: rgba(0, 232, 122, 0.22);
+  box-shadow: 0 0 16px rgba(0, 232, 122, 0.35);
+}
+
+.cesium-token-warn {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 200;
+  background: rgba(255, 61, 85, 0.18);
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--red);
+}
+
+/* Make sure cesium-viewer fills the .map-panel cell from App.css */
+.map-panel .cesium-viewer,
+.map-panel .cesium-viewer-cesiumWidgetContainer,
+.map-panel .cesium-widget,
+.map-panel .cesium-widget canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Imagery tone is now applied at the Cesium ImageryLayer level (in
+ * SceneInit) so it only affects the satellite tiles — entities and
+ * markers stay fully saturated. The CSS canvas filter that used to
+ * sit here was tinting EVERYTHING, including markers; that's been
+ * removed. */
+
+/* Hide cesium credits / unused widgets */
+.cesium-viewer-bottom { display: none !important; }
+.cesium-viewer-toolbar { top: 6px; right: 6px; }
+.cesium-viewer-toolbar .cesium-baseLayerPicker-selected { width: 30px; height: 30px; }
+
+/* Cesium baseLayerPicker dropdown — match dark theme a bit */
+.cesium-baseLayerPicker-dropDown {
+  background: rgba(7, 9, 13, 0.92) !important;
+  border: 1px solid var(--border2) !important;
+  font-family: var(--mono) !important;
+}
+
+/* ── Radar scan pulse · anchored to RADAR entity ─────────────
+ * Three Olo rings, staggered. Position is updated every render
+ * by RadarScanPulse component (cesium → screen projection).
+ * ──────────────────────────────────────────────────────────── */
+.cesium-scan-pulse {
+  position: absolute;
+  /* top/left set dynamically via ref */
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 100;
+  will-change: top, left;
+}
+/* Ring size + opacity are driven by JS in RadarScanPulse so the radius
+ * can track the actual 3km ground sweep at any camera zoom. */
+.scan-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid rgba(0, 255, 188, 0.55);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px rgba(0, 255, 188, 0.18);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Distance scale bar (bottom-LEFT of map cell · was right, conflicted with FLY TO VIP) ── */
+.cesium-scale-bar {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 6px 10px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+.csb-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--olo);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+.csb-bar {
+  height: 3px;
+  min-width: 60px;
+  background: var(--olo);
+  border-left: 1px solid var(--olo);
+  border-right: 1px solid var(--olo);
+  position: relative;
+}
+.csb-bar::before, .csb-bar::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  width: 1px;
+  height: 9px;
+  background: var(--olo);
+}
+.csb-bar::before { left: 0; }
+.csb-bar::after { right: 0; }
+
+/* ─────────────────────────────────────────────────────────────
+ * Airbility brand · readability + look polish for the Cesium 3D.
+ *
+ * Visual rules from the design system:
+ *  - Pure black surface (#000), no off-blacks
+ *  - Olo (#00FFBC) as the only accent / success
+ *  - Wide-tracked uppercase eyebrows on labels (0.14em)
+ *  - Hairline borders (10–22% white)
+ *  - Sharp geometry — radii ≤ 4px
+ *  - Montserrat (display) + Pretendard (body)
+ *  - "Live dot" — Olo with matching glow
+ * ───────────────────────────────────────────────────────────── */
+
+/* Fluid 100vw × 100vh canvas with brand-black background.
+ * Inner 3-row grid: TopBar (52px) · main · BottomBar (40px). */
+.app-canvas {
+  width: 100vw !important;
+  height: 100vh !important;
+  background: var(--bg) !important;
+  position: relative;
+  display: grid !important;
+  grid-template-rows: 52px 1fr 40px !important;
+  grid-template-columns: 100% !important;
+  overflow: hidden !important;
+}
+
+/* ── TOP BAR · brand-styled ──────────────────────────────────── */
+.topbar {
+  background: #000 !important;
+  border-bottom: 1px solid var(--border) !important;
+  backdrop-filter: none;
+  height: 52px !important;
+  padding: 0 20px !important;
+}
+.tb-logo {
+  font-family: var(--display) !important;  /* Montserrat */
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  letter-spacing: 6px !important;
+  color: var(--olo) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.tb-logo::before {
+  /* The brand A-mark · loaded from /public/brand */
+  content: '';
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  background-image: url('/brand/airbility_A_white.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: brightness(1.1);
+}
+.tb-sep {
+  width: 1px !important;
+  height: 24px !important;
+  background: var(--border-strong) !important;
+  margin: 0 16px !important;
+}
+.tb-title {
+  font-family: var(--display) !important;
+  font-weight: 500 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.18em !important;
+  color: var(--fg-muted) !important;
+  text-transform: uppercase !important;
+}
+.tb-ind {
+  font-family: var(--display) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.14em !important;
+  color: var(--fg-muted) !important;
+  text-transform: uppercase;
+}
+.tb-time {
+  font-family: var(--mono) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: var(--fg) !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em !important;
+}
+
+/* ── BOTTOM BAR ──────────────────────────────────────────────── */
+.bottombar {
+  background: #000 !important;
+  border-top: 1px solid var(--border) !important;
+  height: 40px !important;
+  padding: 0 20px !important;
+}
+.bb-item {
+  font-family: var(--mono) !important;
+  font-size: 11px !important;
+  color: var(--fg-muted) !important;
+  font-variant-numeric: tabular-nums;
+}
+.bb-label {
+  font-family: var(--display) !important;
+  font-size: 9.5px !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase;
+  color: var(--fg-subtle) !important;
+}
+
+/* ── SIDE RAILS ──────────────────────────────────────────────── */
+.camera-stack {
+  background: #000 !important;
+  border-right: 1px solid var(--border) !important;
+}
+.right-panel {
+  background: #000 !important;
+  border-left: 1px solid var(--border) !important;
+  backdrop-filter: none;
+}
+
+/* ── CAMERA PANES ────────────────────────────────────────────── */
+.cam-pane {
+  background: #050706 !important;          /* var(--bg-sunken) */
+  border-bottom: 1px solid var(--border) !important;
+}
+.cam-header {
+  font-family: var(--display) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase;
+}
+.cam-title {
+  color: var(--fg) !important;
+  font-weight: 600;
+}
+.cam-status {
+  font-family: var(--display) !important;
+  font-size: 9px !important;
+  letter-spacing: 0.18em !important;
+  padding: 3px 8px !important;
+  border-radius: 2px !important;
+  text-transform: uppercase;
+}
+.cs-green {
+  color: var(--olo) !important;
+  background: var(--olo-12) !important;
+  border: 1px solid var(--olo-30) !important;
+}
+.cs-amber {
+  /* threat in progress — use Olo with intensity, not amber, for live engagement */
+  color: var(--olo) !important;
+  background: var(--olo-12) !important;
+  border: 1px solid var(--olo-60) !important;
+  box-shadow: 0 0 12px rgba(0, 255, 188, 0.18);
+}
+
+/* ── PANEL SECTIONS · brand spec layout ──────────────────────── */
+.panel-section {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+.panel-label {
+  /* The hallmark · wide-tracked uppercase Olo eyebrow */
+  font-family: var(--display) !important;
+  font-weight: 600 !important;
+  font-size: 10px !important;
+  letter-spacing: 0.18em !important;
+  text-transform: uppercase;
+  color: var(--olo) !important;
+  margin-bottom: 10px !important;
+}
+
+/* ── CARDS — brand uses sharp geometry (radius 2-4px) ──────── */
+.card {
+  background: var(--ink-800) !important;   /* #0A0D0C */
+  border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+  padding: 10px 13px !important;
+}
+.card .row {
+  font-size: 11.5px !important;
+  margin-bottom: 5px !important;
+  line-height: 1.45 !important;
+}
+.card .lbl {
+  font-family: var(--display) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase;
+  color: var(--fg-muted) !important;
+}
+.card .val {
+  font-family: var(--mono) !important;
+  font-size: 11.5px !important;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg) !important;
+}
+.card .val.green { color: var(--olo) !important; }
+
+/* ── KILL CHAIN — top-bordered phase columns per brand DNA ─── */
+.kc-step::after {
+  background: var(--border) !important;
+}
+.kc-dot {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50%;
+  background: var(--ink-600) !important;
+  border: 1px solid var(--ink-300) !important;
+}
+.kc-dot.done {
+  background: var(--olo) !important;
+  border-color: var(--olo) !important;
+  box-shadow: 0 0 8px rgba(0, 255, 188, 0.4);
+}
+.kc-dot.current {
+  background: var(--olo) !important;
+  border-color: var(--olo) !important;
+  box-shadow: 0 0 14px rgba(0, 255, 188, 0.7);
+  animation: kc-pulse-olo 1.4s var(--ease-out) infinite !important;
+}
+@keyframes kc-pulse-olo {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 255, 188, 0.5), 0 0 14px rgba(0, 255, 188, 0.7); }
+  50%      { box-shadow: 0 0 0 6px rgba(0, 255, 188, 0), 0 0 18px rgba(0, 255, 188, 0.9); }
+}
+.kc-lbl {
+  font-family: var(--display) !important;
+  font-size: 9.5px !important;
+  font-weight: 500;
+  letter-spacing: 0.10em !important;
+  text-transform: uppercase;
+  color: var(--fg) !important;
+}
+
+/* ── TOGGLES — Olo for active state ──────────────────────────── */
+.toggle-row {
+  background: var(--ink-700) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 3px !important;
+}
+.toggle-btn {
+  font-family: var(--display) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase;
+  color: var(--fg-muted) !important;
+  padding: 7px 10px !important;
+  border-radius: 2px !important;
+}
+.toggle-btn.active {
+  background: var(--ink-800) !important;
+  color: var(--fg) !important;
+  box-shadow: 0 0 0 1px var(--border-strong) !important;
+}
+.toggle-btn.active.payload-net {
+  color: var(--olo) !important;
+  box-shadow: 0 0 0 1px var(--olo-60) !important;
+}
+.toggle-btn.active.payload-shot {
+  /* SHOTGUN keeps amber for payload-mode legibility, but with brand restraint */
+  color: var(--amber) !important;
+  box-shadow: 0 0 0 1px rgba(255, 176, 32, 0.5) !important;
+}
+.toggle-hint {
+  font-family: var(--sans) !important;
+  font-size: 11px !important;
+  color: var(--fg-muted) !important;
+  line-height: 1.55 !important;
+  margin-top: 7px !important;
+  letter-spacing: 0 !important;
+}
+
+/* ── SCENARIO CONTROLS ───────────────────────────────────────── */
+.sc-clock {
+  font-family: var(--mono) !important;
+  font-size: 18px !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em !important;
+  color: var(--fg) !important;
+}
+.sc-state {
+  font-family: var(--display) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase;
+  color: var(--fg-subtle) !important;
+}
+.sc-btn {
+  font-family: var(--display) !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase;
+  padding: 8px 12px !important;
+  background: var(--ink-700) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 2px !important;
+  color: var(--fg-muted) !important;
+}
+.sc-btn:hover {
+  border-color: var(--olo) !important;
+  color: var(--fg) !important;
+}
+.sc-btn.primary {
+  background: var(--olo) !important;
+  color: #000 !important;
+  border-color: var(--olo) !important;
+  box-shadow: var(--glow-olo);
+}
+.sc-btn.primary:hover {
+  background: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
+}
+.sc-btn.record {
+  background: transparent !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--fg-muted) !important;
+}
+.sc-btn.record:hover {
+  border-color: var(--olo) !important;
+  color: var(--olo) !important;
+}
+.sc-btn.record.active {
+  border-color: var(--red) !important;
+  color: var(--red) !important;
+}
+
+/* ── ACTION BUTTONS ──────────────────────────────────────────── */
+.btn-launch {
+  font-family: var(--display) !important;
+  font-weight: 700 !important;
+  font-size: 12.5px !important;
+  letter-spacing: 0.16em !important;
+  border-radius: 3px !important;
+  padding: 14px !important;
+}
+.btn-launch.live {
+  background: var(--olo) !important;
+  color: #000 !important;
+  box-shadow: var(--glow-olo);
+}
+.btn-launch.live:hover {
+  background: var(--accent-hover) !important;
+}
+.btn-launch.disabled {
+  background: var(--ink-700) !important;
+  color: var(--fg-subtle) !important;
+}
+.btn-dismiss {
+  font-family: var(--display) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase;
+  padding: 9px !important;
+  background: transparent !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--fg-muted) !important;
+  border-radius: 2px !important;
+}
+.btn-sub {
+  font-family: var(--display) !important;
+  font-size: 9.5px !important;
+  letter-spacing: 0.16em !important;
+  color: var(--olo) !important;
+}
+
+/* ── STATUS LOG ──────────────────────────────────────────────── */
+.status-log {
+  font-family: var(--mono) !important;
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+  background: var(--ink-800) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 3px !important;
+  padding: 8px 10px !important;
+}
+.log-line { grid-template-columns: 60px 50px 1fr !important; }
+.log-t {
+  color: var(--fg-subtle) !important;
+  font-variant-numeric: tabular-nums;
+}
+.log-sev {
+  font-family: var(--display) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.10em !important;
+}
+.log-msg { color: var(--fg) !important; }
+
+/* ── BADGE/STATUS ──────────────────────────────────────────── */
+.asset-status,
+.card .val.amber, .card .val.red {
+  /* keep red/amber where used, but with brand-restraint tone */
+}
+
+/* ── DOT-LIVE — Olo glow w/ pulse ────────────────────────────── */
+.dot-live {
+  background: var(--olo) !important;
+  box-shadow: 0 0 8px var(--olo) !important;
+}
+
+/* ── HOTKEY HINT ─────────────────────────────────────────────── */
+.hotkey-hint {
+  background: rgba(0, 0, 0, 0.65) !important;
+  border: 1px solid var(--border) !important;
+  font-family: var(--display) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.10em !important;
+  color: var(--fg-subtle) !important;
+  border-radius: 3px !important;
+}
+.kbd {
+  font-family: var(--mono) !important;
+  background: var(--ink-700) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 2px !important;
+  font-size: 10px !important;
+}
+
+/* ── STANDBY HINT (start splash) ─────────────────────────────── */
+.sh-card {
+  background: rgba(0, 0, 0, 0.92) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 4px !important;
+}
+.sh-eyebrow {
+  font-family: var(--display) !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.22em !important;
+  color: var(--olo) !important;
+  text-transform: uppercase;
+}
+.sh-title {
+  font-family: var(--display) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+}
+.sh-body { font-family: var(--sans) !important; }
+.sh-icon {
+  font-family: var(--display) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.14em !important;
+  background: var(--ink-700) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 2px !important;
+}
+
+/* ── DEBRIEF MODAL · brand-faithful ──────────────────────────── */
+.debrief-card {
+  background: #000 !important;
+  border: 1px solid var(--olo-60) !important;
+  border-radius: 6px !important;
+}
+.dbf-header {
+  background: linear-gradient(135deg, var(--olo-12), transparent) !important;
+}
+.dbf-status {
+  font-family: var(--display) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.12em !important;
+}
+.dbf-sub {
+  font-family: var(--display) !important;
+  letter-spacing: 0.18em !important;
+}
+.dbf-label {
+  font-family: var(--display) !important;
+  font-weight: 600 !important;
+  font-size: 10px !important;
+  letter-spacing: 0.18em !important;
+  color: var(--olo) !important;
+}
+.dbf-section { background: var(--ink-800) !important; padding: 18px 22px !important; }
+.dbf-k {
+  font-family: var(--display) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase;
+  color: var(--fg-muted) !important;
+}
+.dbf-v {
+  font-family: var(--mono) !important;
+  font-size: 11.5px !important;
+  font-variant-numeric: tabular-nums;
+}
+.dbf-v.green { color: var(--olo) !important; }
+.dbf-callout {
+  background: var(--olo-12) !important;
+  border-color: var(--olo-30) !important;
+}
+.dbf-callout strong { color: var(--olo) !important; }
+.dbf-btn-primary {
+  background: var(--olo) !important;
+  color: #000 !important;
+  font-family: var(--display) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.14em !important;
+}
+.dbf-btn-secondary {
+  font-family: var(--display) !important;
+  letter-spacing: 0.14em !important;
+}
+
+/* ── THREAT / INTERCEPT cards · keep functional red/olo ────── */
+.card.threat.hostile {
+  background: rgba(255, 61, 85, 0.04) !important;
+  border-color: rgba(255, 61, 85, 0.30) !important;
+}
+.card.intercept {
+  background: var(--olo-06) !important;
+  border-color: var(--olo-30) !important;
+}
