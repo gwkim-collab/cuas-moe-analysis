@@ -580,6 +580,23 @@ export default function App() {
       }),
     [],
   )
+  const mc01LeaderMaterial = useMemo(
+    () =>
+      new PolylineDashMaterialProperty({
+        color: Color.fromCssColorString('#9b6bff').withAlpha(0.55),
+        dashLength: 12,
+      }),
+    [],
+  )
+
+  // MC-01 is at a fixed orbit position — positions array is constant.
+  const mc01LeaderPositions = useMemo(
+    () => [
+      Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 45),
+      Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 0),
+    ],
+    [],
+  )
 
   // Ground tick (small ring at the foot of the leader) — gives the eye
   // a "this is the ground point under the airborne object" anchor.
@@ -734,7 +751,7 @@ export default function App() {
               <EllipseGraphics
                 semiMajorAxis={28}
                 semiMinorAxis={28}
-                height={0}
+                height={1}
                 material={Color.fromCssColorString('#5fb6ff').withAlpha(0.18)}
                 outline
                 outlineColor={Color.fromCssColorString('#5fb6ff').withAlpha(0.9)}
@@ -745,7 +762,7 @@ export default function App() {
               <EllipseGraphics
                 semiMajorAxis={4}
                 semiMinorAxis={4}
-                height={0}
+                height={1}
                 material={Color.fromCssColorString('#5fb6ff')}
               />
               <LabelGraphics
@@ -767,7 +784,7 @@ export default function App() {
               <EllipseGraphics
                 semiMajorAxis={32}
                 semiMinorAxis={32}
-                height={0}
+                height={1}
                 material={Color.fromCssColorString('#00FFBC').withAlpha(0.20)}
                 outline
                 outlineColor={Color.fromCssColorString('#00FFBC').withAlpha(0.95)}
@@ -778,7 +795,7 @@ export default function App() {
               <EllipseGraphics
                 semiMajorAxis={5}
                 semiMinorAxis={5}
-                height={0}
+                height={1}
                 material={Color.fromCssColorString('#00FFBC')}
               />
               <LabelGraphics
@@ -798,17 +815,9 @@ export default function App() {
             {/* MC-01 · multicopter overwatch + altitude leader (45m) */}
             <Entity name="MC-01-leader">
               <PolylineGraphics
-                positions={[
-                  Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 45),
-                  Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 0),
-                ]}
+                positions={mc01LeaderPositions}
                 width={1.5}
-                material={
-                  new PolylineDashMaterialProperty({
-                    color: Color.fromCssColorString('#9b6bff').withAlpha(0.55),
-                    dashLength: 12,
-                  })
-                }
+                material={mc01LeaderMaterial}
               />
             </Entity>
             <Entity
@@ -818,7 +827,7 @@ export default function App() {
               <EllipseGraphics
                 semiMajorAxis={6}
                 semiMinorAxis={6}
-                height={0}
+                height={1}
                 material={Color.fromCssColorString('#9b6bff').withAlpha(0.18)}
                 outline
                 outlineColor={Color.fromCssColorString('#9b6bff').withAlpha(0.7)}
@@ -866,7 +875,7 @@ export default function App() {
               <EllipseGraphics
                 semiMajorAxis={6}
                 semiMinorAxis={6}
-                height={0}
+                height={1}
                 material={Color.fromCssColorString('#00FFBC').withAlpha(0.18)}
                 outline
                 outlineColor={Color.fromCssColorString('#00FFBC').withAlpha(0.7)}
@@ -925,7 +934,7 @@ export default function App() {
               <EllipseGraphics
                 semiMajorAxis={6}
                 semiMinorAxis={6}
-                height={0}
+                height={1}
                 material={Color.fromCssColorString('#ff3d55').withAlpha(0.18)}
                 outline
                 outlineColor={Color.fromCssColorString('#ff3d55').withAlpha(0.7)}
@@ -1018,7 +1027,7 @@ export default function App() {
               <EllipseGraphics
                 semiMajorAxis={250}
                 semiMinorAxis={250}
-                height={0}
+                height={1}
                 material={Color.fromCssColorString('#7a8a9e').withAlpha(0.10)}
                 outline
                 outlineColor={Color.fromCssColorString('#7a8a9e').withAlpha(0.7)}
@@ -1038,7 +1047,7 @@ export default function App() {
               <EllipseGraphics
                 semiMajorAxis={120}
                 semiMinorAxis={120}
-                height={0}
+                height={1}
                 material={Color.fromCssColorString(
                   tel.payload_mode === 'net_gun' ? '#ffb020' : '#ff7a3d',
                 ).withAlpha(0.18)}
@@ -1094,7 +1103,7 @@ export default function App() {
                 semiMajorAxis={engagementRadius as unknown as number}
                 semiMinorAxis={engagementRadius as unknown as number}
                 material={engagementMaterial}
-                height={0}
+                height={1}
                 outline
                 outlineColor={engagementOutlineColor as unknown as Color}
                 outlineWidth={tel.payload_mode === 'net_gun' ? 2 : 4}
@@ -1145,7 +1154,7 @@ export default function App() {
               <EllipseGraphics
                 semiMajorAxis={80}
                 semiMinorAxis={80}
-                height={0}
+                height={1}
                 material={Color.fromCssColorString('#7a8a9e').withAlpha(0.18)}
                 outline
                 outlineColor={Color.fromCssColorString('#7a8a9e')}
@@ -1174,7 +1183,7 @@ export default function App() {
                 semiMajorAxis={groundImpactRadius as unknown as number}
                 semiMinorAxis={groundImpactRadius as unknown as number}
                 material={groundImpactMaterial}
-                height={0}
+                height={1}
                 outline
                 outlineColor={groundImpactOutline as unknown as Color}
                 outlineWidth={1.5}
