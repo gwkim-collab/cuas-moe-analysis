@@ -77,11 +77,16 @@ export function u10Position(tel: CUASTelemetry): LL {
   const approach = approachPoint(capture)
 
   if (phase === 'launch') {
-    // Bezier ends at the 6-o'clock approach point, NOT the capture (drone's)
-    // point. So at launch end AB-U10 is sitting ~50m behind the threat,
-    // looking down its tail.
     const u = Math.min(1, Math.max(0, (tel.scenario_clock_ms - LAUNCH_T0_MS) / LAUNCH_DURATION_MS))
-    return bezier2(standby, swingPoint(capture), approach, u)
+    // VTOL phase · stay over the pad while ducts rotate and the airframe climbs.
+    // Only after the climb is committed does horizontal motion begin.
+    if (u < LAUNCH_HOLD_AT_PAD) return standby
+    // Remap remaining progress to the bezier (standby → swing → approach).
+    // Endpoint is the 6-o'clock approach point, NOT the capture (drone's)
+    // point — at launch end AB-U10 sits ~50m behind the threat, looking
+    // down its tail.
+    const v = (u - LAUNCH_HOLD_AT_PAD) / (1 - LAUNCH_HOLD_AT_PAD)
+    return bezier2(standby, swingPoint(capture), approach, v)
   }
 
   // capture: hold at the 6 o'clock for the engagement window (CAPTURE_HOLD_MS),
@@ -119,12 +124,19 @@ export function u10HeadingDeg(tel: CUASTelemetry): number {
   let dLat: number, dLon: number
   if (phase === 'launch') {
     const u = Math.min(1, Math.max(0, (tel.scenario_clock_ms - LAUNCH_T0_MS) / LAUNCH_DURATION_MS))
-    // bezier'(t) = 2(1-t)(P1-P0) + 2t(P2-P1) — endpoint is the approach
-    // point, so the final tangent points from swing → approach (NW→SE).
-    const a = 2 * (1 - u)
-    const b = 2 * u
-    dLat = a * (swing[0] - standby[0]) + b * (approach[0] - swing[0])
-    dLon = a * (swing[1] - standby[1]) + b * (approach[1] - swing[1])
+    if (u < LAUNCH_HOLD_AT_PAD) {
+      // VTOL · point the nose toward the swing bearing so the airframe
+      // is already oriented for forward flight when the ducts rotate.
+      dLat = swing[0] - standby[0]
+      dLon = swing[1] - standby[1]
+    } else {
+      // bezier'(v) tangent on the remapped progress
+      const v = (u - LAUNCH_HOLD_AT_PAD) / (1 - LAUNCH_HOLD_AT_PAD)
+      const a = 2 * (1 - v)
+      const b = 2 * v
+      dLat = a * (swing[0] - standby[0]) + b * (approach[0] - swing[0])
+      dLon = a * (swing[1] - standby[1]) + b * (approach[1] - swing[1])
+    }
   } else if (phase === 'capture') {
     const captureT = tel.scenario_clock_ms - CAPTURE_T0_MS
     if (captureT < CAPTURE_HOLD_MS) {
@@ -161,14 +173,32 @@ export function launchPathBezier(capture: LL, steps = 32): LL[] {
 }
 
 // ── 3D extensions (lat, lon, altitude_m_agl) ──────────────────
-// Used by the Cesium variant. Altitude profile:
-//   STANDBY/DETECT/CONFIRM/APPROVE  → 12m (pad height)
-//   LAUNCH                          → 12 → 95m climb (vertical takeoff)
-//   CAPTURE                         → 95m (level)
-//   REPORT                          → 95 → 12m descent (RTB approach)
+// Used by the Cesium variant. AB-U10 is a tilt-duct VTOL — the flight
+// profile reflects that:
+//   STANDBY/DETECT/CONFIRM/APPROVE  → 12m  (pad height, ducts down)
+//   LAUNCH (4 stages over 11s):
+//     0–25%  · vertical takeoff 12 → 60m, ducts rotating fwd
+//     25–55% · climb-out 60 → 95m, level acceleration begins
+//     55–85% · level cruise at 95m, transit to swing point
+//     85–100%· level turn into the threat's 6-o'clock (no altitude change)
+//   CAPTURE                         → 95m (level engagement window)
+//   REPORT                          → 95 → 12m, ease-in descent (RTB)
 export type LLA = [number, number, number]
 const STANDBY_ALT = 12
-const CAPTURE_ALT = 95
+const CRUISE_ALT = 95
+const VTOL_TOP = 60                      // alt at end of vertical climb stage
+
+const LAUNCH_VTOL_END = 0.25            // u of launch progress
+const LAUNCH_CLIMBOUT_END = 0.55
+const LAUNCH_CRUISE_END = 0.85          // (level turn after this)
+const LAUNCH_HOLD_AT_PAD = 0.20         // u of launch progress; horizontal stays at pad until here
+
+function easeInOut(u: number): number {
+  return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2
+}
+function easeIn(u: number): number {
+  return u * u
+}
 
 export function u10Altitude(tel: CUASTelemetry): number {
   const phase = tel.kill_chain.phase
@@ -177,13 +207,24 @@ export function u10Altitude(tel: CUASTelemetry): number {
   }
   if (phase === 'launch') {
     const u = Math.min(1, Math.max(0, (tel.scenario_clock_ms - LAUNCH_T0_MS) / LAUNCH_DURATION_MS))
-    return STANDBY_ALT + (CAPTURE_ALT - STANDBY_ALT) * u
+    if (u < LAUNCH_VTOL_END) {
+      // Stage 1 · vertical takeoff (ease-in-out so the climb feels weighty)
+      const v = u / LAUNCH_VTOL_END
+      return STANDBY_ALT + (VTOL_TOP - STANDBY_ALT) * easeInOut(v)
+    }
+    if (u < LAUNCH_CLIMBOUT_END) {
+      // Stage 2 · climb-out to cruise altitude
+      const v = (u - LAUNCH_VTOL_END) / (LAUNCH_CLIMBOUT_END - LAUNCH_VTOL_END)
+      return VTOL_TOP + (CRUISE_ALT - VTOL_TOP) * easeInOut(v)
+    }
+    // Stage 3+4 · level cruise + level turn at engagement altitude
+    return CRUISE_ALT
   }
-  if (phase === 'capture') return CAPTURE_ALT
-  // REPORT — descend back to pad over the RTB window
+  if (phase === 'capture') return CRUISE_ALT
+  // REPORT — ease-in descent (stay high, then drop fast for the pad)
   if (phase === 'report') {
     const u = Math.min(1, Math.max(0, (tel.scenario_clock_ms - CAPTURE_T0_MS) / RTB_DURATION_MS))
-    return CAPTURE_ALT + (STANDBY_ALT - CAPTURE_ALT) * u
+    return CRUISE_ALT + (STANDBY_ALT - CRUISE_ALT) * easeIn(u)
   }
   return STANDBY_ALT
 }
