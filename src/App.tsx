@@ -4,9 +4,11 @@ import {
   Entity,
   useCesium,
   BillboardGraphics,
+  BoxGraphics,
   PolylineGraphics,
   LabelGraphics,
   EllipseGraphics,
+  EllipsoidGraphics,
   ModelGraphics,
 } from 'resium'
 import {
@@ -462,6 +464,69 @@ export default function App() {
     [],
   )
 
+  // ── Threat-attached effects (NET wireframe / SHOTGUN explosion) ────
+  // These ride the threat entity's position so they fall with it.
+  // NET: a 6×6×6m wireframe box surrounding the drone (the deployed mesh).
+  // SHOTGUN: an expanding ellipsoid blast and a brief HOSTILE billboard fade.
+  const NET_BOX_SIDE_M = 6
+  const netBoxDimensions = useMemo(
+    () =>
+      new CallbackProperty(() => {
+        const tt = telRef.current
+        if (tt.kill_chain.phase !== 'capture') return new Cartesian3(0.001, 0.001, 0.001)
+        const captureT = tt.scenario_clock_ms - PHASE_SCHEDULE.capture
+        // Net deploys 0 → full size in 0.4s, then stays.
+        const u = Math.min(1, captureT / 400)
+        const side = Math.max(0.001, NET_BOX_SIDE_M * u)
+        return new Cartesian3(side, side, side)
+      }, false),
+    [],
+  )
+
+  const blastRadii = useMemo(
+    () =>
+      new CallbackProperty(() => {
+        const tt = telRef.current
+        if (tt.kill_chain.phase !== 'capture') return new Cartesian3(0.001, 0.001, 0.001)
+        const captureT = tt.scenario_clock_ms - PHASE_SCHEDULE.capture
+        const u = Math.min(1, captureT / ENGAGEMENT_DURATION_MS)
+        // SHOTGUN blast sphere: 0 → 18m radius
+        const r = Math.max(0.001, 18 * (1 - Math.pow(1 - u, 2)))
+        return new Cartesian3(r, r, r)
+      }, false),
+    [],
+  )
+
+  const blastFillMaterial = useMemo(
+    () =>
+      new ColorMaterialProperty(
+        new CallbackProperty(() => {
+          const tt = telRef.current
+          const captureT = tt.scenario_clock_ms - PHASE_SCHEDULE.capture
+          const opacity = Math.max(0, 1 - captureT / ENGAGEMENT_DURATION_MS) * 0.55
+          return Color.fromCssColorString(SHOT_COLOR).withAlpha(opacity)
+        }, false),
+      ),
+    [],
+  )
+
+  // HOSTILE billboard color · SHOTGUN fades the drone out after the flash;
+  // NET keeps it visible (caught, not destroyed).
+  const hostileBillboardColor = useMemo(
+    () =>
+      new CallbackProperty(() => {
+        const tt = telRef.current
+        const phase = tt.kill_chain.phase
+        if (phase !== 'capture' && phase !== 'report') return Color.WHITE
+        if (tt.payload_mode === 'net_gun') return Color.WHITE.withAlpha(0.95)
+        // SHOTGUN: rapid fade starting 0.3s in
+        const captureT = tt.scenario_clock_ms - PHASE_SCHEDULE.capture
+        const u = Math.min(1, Math.max(0, (captureT - 300) / 700))
+        return Color.WHITE.withAlpha(Math.max(0.05, 1 - u))
+      }, false),
+    [],
+  )
+
   // ── Pre-fire trail ────────────────────────────────────────────
   // Brief polyline AB-U10 → threat during the engagement instant
   // (last ~0.5s of launch + first ~0.5s of capture). Reads as the
@@ -665,7 +730,8 @@ export default function App() {
             {/* Keep U10_ICON billboard import alive (not rendered while model is in use) */}
             {false && <BillboardGraphics image={U10_ICON} />}
 
-            {/* Hostile FPV — pre-mounted; show toggles on track presence */}
+            {/* Hostile FPV — pre-mounted; show toggles on track presence.
+                Billboard color is dynamic so SHOTGUN can fade it out post-blast. */}
             <Entity
               name="HOSTILE"
               position={threatPositionProperty as unknown as Cartesian3}
@@ -677,11 +743,12 @@ export default function App() {
                 height={93}
                 verticalOrigin={VerticalOrigin.BOTTOM}
                 heightReference={HeightReference.RELATIVE_TO_GROUND}
+                color={hostileBillboardColor as unknown as Color}
               />
               <LabelGraphics
                 text={
                   track
-                    ? `${track.classification === 'hostile_fpv' ? '⚠ HOSTILE FPV' : '? UNKNOWN UAS'} · ${track.alt_m_agl}m`
+                    ? `${track.classification === 'hostile_fpv' ? '⚠ HOSTILE FPV' : '? UNKNOWN UAS'} · ${track.alt_m_agl.toFixed(0)}m`
                     : 'HOSTILE'
                 }
                 font='bold 13px "Montserrat"'
@@ -692,6 +759,36 @@ export default function App() {
                 pixelOffset={new Cartesian2(86, -64)}
                 showBackground
                 backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.92)')}
+              />
+            </Entity>
+
+            {/* Threat-attached engagement effect · rides the threat as it falls.
+                NET GUN  : 6×6×6m wireframe box (the deployed mesh) around drone
+                SHOTGUN  : expanding blast ellipsoid + threat fade (above) */}
+            <Entity
+              name="threat-engagement"
+              position={threatPositionProperty as unknown as Cartesian3}
+              show={!!track && phase === 'capture' && tel.payload_mode === 'net_gun'}
+            >
+              <BoxGraphics
+                dimensions={netBoxDimensions as unknown as Cartesian3}
+                fill={false}
+                outline
+                outlineColor={engagementOutlineColor as unknown as Color}
+                outlineWidth={2.5}
+              />
+            </Entity>
+            <Entity
+              name="threat-blast"
+              position={threatPositionProperty as unknown as Cartesian3}
+              show={!!track && phase === 'capture' && tel.payload_mode === 'shotgun'}
+            >
+              <EllipsoidGraphics
+                radii={blastRadii as unknown as Cartesian3}
+                material={blastFillMaterial}
+                outline
+                outlineColor={engagementOutlineColor as unknown as Color}
+                outlineWidth={2.5}
               />
             </Entity>
 

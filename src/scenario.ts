@@ -174,6 +174,17 @@ function updateTracks(
     const range_m = haversine(CAPTURE_LAT, CAPTURE_LON, INCHEON.vip_lat, INCHEON.vip_lon)
     const bearing_deg = bearing(INCHEON.vip_lat, INCHEON.vip_lon, CAPTURE_LAT, CAPTURE_LON)
     const prev = prevTracks[HOSTILE_TRACK_ID]
+    // Fall motion · drone drops 85m → 0m over 2s starting at the moment of
+    // engagement. Quadratic easing approximates "caught/blown out of the air"
+    // (slow at first, accelerates with gravity). Sticks at 0 in REPORT.
+    let alt_m_agl: number
+    if (phase === 'report') {
+      alt_m_agl = 0
+    } else {
+      const captureT = Math.max(0, t_ms - PHASE_SCHEDULE.capture)
+      const fallU = Math.min(1, captureT / 2000)
+      alt_m_agl = Math.max(0, 85 * (1 - Math.pow(fallU, 1.6)))
+    }
     const frozen: TrackedTarget = {
       track_id: HOSTILE_TRACK_ID,
       classification: 'hostile_fpv',
@@ -182,7 +193,7 @@ function updateTracks(
       last_seen_ms: t_ms,
       lat_deg: CAPTURE_LAT,
       lon_deg: CAPTURE_LON,
-      alt_m_agl: phase === 'report' ? 0 : 85, // crashed
+      alt_m_agl,
       bearing_deg,
       range_m,
       ground_speed_m_s: 0,                    // stopped · intercept successful
