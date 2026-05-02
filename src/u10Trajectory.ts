@@ -242,7 +242,7 @@ export function launchPathBezier3D(capture: LL, steps = 32): LLA[] {
   const ll = launchPathBezier(capture, steps)
   return ll.map(([lat, lon], i) => {
     const t = i / steps
-    const alt = STANDBY_ALT + (CAPTURE_ALT - STANDBY_ALT) * t
+    const alt = STANDBY_ALT + (CRUISE_ALT - STANDBY_ALT) * t
     return [lat, lon, alt] as LLA
   })
 }
