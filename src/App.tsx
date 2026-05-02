@@ -103,30 +103,12 @@ function SceneInit({ onReady, flyKey }: { onReady: () => void; flyKey: number })
     viewer.scene.globe.depthTestAgainstTerrain = true
     viewer.cesiumWidget.creditContainer.setAttribute('style', 'display:none')
 
-    // ── Camera · setView with diagnostic + retry workaround ─────
-    // Some condition is leaving the camera at the globe-from-space
-    // default. Brute-force workaround: setView immediately, plus a
-    // staggered set of retries — one of them will land after whatever
-    // is currently overriding us, and we'll see in the logs which.
-    const setCam = (label: string) => {
-      if (viewer.isDestroyed && viewer.isDestroyed()) return
-      const before = viewer.camera.positionCartographic?.height
-      viewer.camera.setView({
-        destination: CAMERA_DEST,
-        orientation: { heading: CAMERA_HEADING, pitch: CAMERA_PITCH, roll: 0 },
-      })
-      viewer.scene.requestRender()
-      const after = viewer.camera.positionCartographic?.height
-      // eslint-disable-next-line no-console
-      console.log(`[SceneInit] ${label} · height ${before?.toFixed(0)} → ${after?.toFixed(0)}`)
-    }
-
-    setCam('T+0ms (sync)')
-    const t1 = window.setTimeout(() => setCam('T+50ms'), 50)
-    const t2 = window.setTimeout(() => setCam('T+200ms'), 200)
-    const t3 = window.setTimeout(() => setCam('T+500ms'), 500)
-    const t4 = window.setTimeout(() => setCam('T+1000ms'), 1000)
-    const t5 = window.setTimeout(() => setCam('T+2000ms'), 2000)
+    // ── Camera fly-in ────────────────────────────────────────
+    viewer.camera.setView({
+      destination: CAMERA_DEST,
+      orientation: { heading: CAMERA_HEADING, pitch: CAMERA_PITCH, roll: 0 },
+    })
+    viewer.scene.requestRender()
 
     // ── Performance · cap render resolution ─────────────────
     viewer.useBrowserRecommendedResolution = false
@@ -161,11 +143,6 @@ function SceneInit({ onReady, flyKey }: { onReady: () => void; flyKey: number })
 
     onReady()
     return () => {
-      window.clearTimeout(t1)
-      window.clearTimeout(t2)
-      window.clearTimeout(t3)
-      window.clearTimeout(t4)
-      window.clearTimeout(t5)
       onAdd()
     }
   }, [viewer, onReady, flyKey])
