@@ -34,17 +34,30 @@ export default function U10FrontCam({ tel }: Props) {
         ? 1
         : 0
 
-  // Pitch: nose-up at takeoff, levels off mid-launch, level at capture.
+  // Pitch: VTOL nose-up at takeoff (first 25%), gradual nose-down to
+  // level for cruise. Matches the staged altitude profile in u10Trajectory.
   const pitchDeg =
     phase === 'launch'
-      ? 14 * (1 - Math.min(1, launchProgress * 1.5))
+      ? launchProgress < 0.25
+        ? 18 * (launchProgress / 0.25)             // 0 → 18° during VTOL
+        : launchProgress < 0.55
+          ? 18 - 18 * ((launchProgress - 0.25) / 0.30)  // 18° → 0° climb-out
+          : 0                                       // level cruise + turn
       : 0
 
-  // Roll (banking): peaks ~mid-swing as AB-U10 arcs left around the
-  // threat. Sin-shaped: 0° → -16° (left bank) → 0°.
+  // Roll (banking): mostly flat during VTOL/climb-out (no horizontal
+  // motion to bank into), then a held coordinated bank during the level
+  // turn into 6-o'clock. Bank-in starts at ~55%, peaks at -22°, holds,
+  // bank-out at ~95%.
   const rollDeg =
     phase === 'launch'
-      ? -16 * Math.sin(launchProgress * Math.PI)
+      ? launchProgress < 0.55
+        ? 0
+        : launchProgress < 0.65
+          ? -22 * ((launchProgress - 0.55) / 0.10)             // bank-in
+          : launchProgress < 0.92
+            ? -22                                              // hold turn
+            : -22 * (1 - (launchProgress - 0.92) / 0.08)       // bank-out
       : 0
 
   // ── AI tracker box dynamics ──────────────────────────────────
@@ -55,11 +68,32 @@ export default function U10FrontCam({ tel }: Props) {
   // AI lock tightens. Captured (and centered) at engagement.
   const t = tel.scenario_clock_ms / 1000
 
-  // The "acquire ramp" — box fades in over the first 35% of launch as
-  // the AI gets steady tracking, then stays solid through capture.
+  // ── Range-based acquire ramp ────────────────────────────────
+  // The lock is driven by SLANT RANGE, not launch progress, so the
+  // tracker's behavior matches what an AI would actually do:
+  //   range > 1500m  : SEARCHING — no box (sensor noise only)
+  //   1500..900m     : ACQUIRING — flickering, sub-stable box
+  //   900..400m      : TRACKING  — solid lock building
+  //   < 400m         : LOCK      — full confidence
+  const rangeM = track?.range_m ?? Infinity
+  const acquireBase =
+    rangeM > 1500
+      ? 0
+      : rangeM > 900
+        ? 0.15 + 0.15 * ((1500 - rangeM) / 600)        // 0.15 → 0.30
+        : rangeM > 400
+          ? 0.30 + 0.65 * ((900 - rangeM) / 500)       // 0.30 → 0.95
+          : 1.0
+  // Flicker during ACQUIRING — random-ish dropouts simulate the AI
+  // re-acquiring as the target moves through clutter. Smooth from a
+  // pair of sines so it stays deterministic.
+  const flickerActive = rangeM <= 1500 && rangeM > 900
+  const flicker = flickerActive
+    ? 0.5 + 0.5 * Math.sin(t * 9.3) * Math.cos(t * 4.1)
+    : 1
   const acquireRamp =
     phase === 'launch'
-      ? Math.min(1, Math.max(0, (launchProgress - 0.05) / 0.35))
+      ? acquireBase * flicker
       : phase === 'capture' || phase === 'report'
         ? 1
         : 0
@@ -90,10 +124,16 @@ export default function U10FrontCam({ tel }: Props) {
   const boxSize = baseBoxSize * acquireRamp
   const boxOpacity = acquireRamp
 
-  // Tracker label shifts by phase
+  // Tracker label · driven by range, matching the acquire ramp's bands.
   const aiState =
     phase === 'launch'
-      ? launchProgress < 0.4 ? 'AI · ACQUIRING' : 'AI · TRACKING'
+      ? rangeM > 1500
+        ? 'AI · SEARCH'
+        : rangeM > 900
+          ? 'AI · ACQUIRING'
+          : rangeM > 400
+            ? 'AI · TRACKING'
+            : 'AI · LOCK'
       : phase === 'capture'
         ? 'AI · LOCK'
         : 'STANDBY'
