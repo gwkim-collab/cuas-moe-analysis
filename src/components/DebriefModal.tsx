@@ -43,7 +43,6 @@ export default function DebriefModal({ tel, onReset }: Props) {
               <Row k="CAPTURE LOCATION" v={`VIP +${(track.range_m).toFixed(0)}m W`} tone="green" />
               <Row k="CAPTURE COORDINATES" v={`${track.lat_deg.toFixed(5)}° N · ${track.lon_deg.toFixed(5)}° E`} mono />
               <Row k="CAPTURE ALT (AGL)" v="95 m" />
-              <Row k="MODE" v={tel.scenario_mode.toUpperCase()} />
             </div>
           </div>
 

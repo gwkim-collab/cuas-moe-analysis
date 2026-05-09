@@ -182,14 +182,11 @@ export interface ProtectedAsset {
   description: string                // 'INCHEON AIRPORT · TERMINAL 1'
 }
 
-export type ScenarioMode = 'auto' | 'manual'
-
 // ── Top-level state object the UI consumes ───────────────────
 
 export interface CUASTelemetry {
   // scenario chrome
   scenario_clock_ms: number
-  scenario_mode: ScenarioMode
   payload_mode: PayloadMode
   kill_chain: KillChainState
 
@@ -206,4 +203,22 @@ export interface CUASTelemetry {
 
   // misc
   gcs_version: string
+
+  // Per-scenario randomized hostile spawn origin (in a 360° annulus
+  // around VIP). Set once at initialState and frozen for the run; reset
+  // re-rolls a new origin so each playthrough has a different approach
+  // vector.
+  threat_origin: { lat: number; lon: number }
+
+  // Capture (intercept) point — chosen at scenario start from a
+  // pre-defined list of low-collateral zones (river / park / bridge),
+  // picking the one best aligned with the threat approach vector.
+  // Stored alongside threat_origin so all consumers (track lerp,
+  // intercept solution, AB-U10 trajectory, capture markers) agree.
+  capture_point: {
+    lat: number
+    lon: number
+    name: string
+    type: 'river' | 'park' | 'bridge'
+  }
 }

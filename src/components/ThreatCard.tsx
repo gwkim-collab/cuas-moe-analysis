@@ -21,6 +21,10 @@ export default function ThreatCard({ tel }: Props) {
   const isHostile = track.classification === 'hostile_fpv'
   const headerColor = isHostile ? 'var(--red)' : 'var(--amber)'
 
+  // Range escalation · further = neutral, closing = amber, < 1km = red.
+  const rangeKm = track.range_m / 1000
+  const rangeClass = rangeKm < 1 ? 'red' : rangeKm < 2 ? 'amber' : ''
+
   return (
     <div className="panel-section">
       <div className="panel-label" style={{ color: headerColor }}>
@@ -43,7 +47,7 @@ export default function ThreatCard({ tel }: Props) {
         </div>
         <div className="row">
           <span className="lbl">RANGE</span>
-          <span className="val red">{(track.range_m / 1000).toFixed(2)} km</span>
+          <span className={`val ${rangeClass}`}>{rangeKm.toFixed(2)} km</span>
         </div>
         <div className="row">
           <span className="lbl">SPEED</span>

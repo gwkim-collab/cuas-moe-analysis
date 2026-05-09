@@ -35,7 +35,7 @@ export default function BottomBar({ tel }: Props) {
       <div className="bb-item">
         <span className="bb-label">MODE</span>
         <span style={{ color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: 10 }}>
-          C-UAS · {tel.scenario_mode.toUpperCase()}
+          C-UAS · AUTO
         </span>
       </div>
       <div className="bb-item">

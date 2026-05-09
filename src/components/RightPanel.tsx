@@ -1,22 +1,18 @@
-import type { CUASTelemetry, PayloadMode, ScenarioMode } from '../types'
+import type { CUASTelemetry, PayloadMode } from '../types'
 import KillChainTimeline from './KillChainTimeline'
 import StatusLog from './StatusLog'
 import ThreatCard from './ThreatCard'
 import InterceptCard from './InterceptCard'
 import ScenarioControls from './ScenarioControls'
-import ActionButtons from './ActionButtons'
 
 interface Props {
   tel: CUASTelemetry
   running: boolean
   isRecording: boolean
-  onScenarioMode: (m: ScenarioMode) => void
   onPayloadMode: (p: PayloadMode) => void
   onStart: () => void
   onPause: () => void
   onReset: () => void
-  onApprove: () => void
-  onDismiss: () => void
   onRecord: () => void
 }
 
@@ -26,6 +22,8 @@ export default function RightPanel(p: Props) {
   const phase = tel.kill_chain.phase
 
   // Color cue for AB-U10 status badge based on phase.
+  // Semantics: green = nominal / progress, amber = caution / decision,
+  // red = engagement-active (only the actual KILL moment lights red).
   const u10StatusText =
     phase === 'launch'
       ? 'AIRBORNE'
@@ -38,11 +36,19 @@ export default function RightPanel(p: Props) {
             : 'STANDBY'
 
   const u10StatusClass =
-    phase === 'launch' || phase === 'capture'
-      ? 'red'
-      : phase === 'approve' || phase === 'confirm'
-        ? 'amber'
-        : 'green'
+    phase === 'capture'
+      ? 'red'                              // active engagement only
+      : phase === 'approve'
+        ? 'amber'                          // decision window
+        : 'green'                          // standby / confirm / launch / report — nominal
+
+  // Battery threshold coloring · ≤15% red, ≤30% amber, else green.
+  const batteryPct = u10?.battery?.remaining_pct ?? null
+  const batteryClass =
+    batteryPct == null ? '' :
+      batteryPct <= 15 ? 'red' :
+        batteryPct <= 30 ? 'amber' :
+          'green'
 
   return (
     <aside className="right-panel">
@@ -55,30 +61,6 @@ export default function RightPanel(p: Props) {
         onReset={p.onReset}
         onRecord={p.onRecord}
       />
-
-      {/* Mode toggles */}
-      <div className="panel-section">
-        <div className="panel-label">SCENARIO MODE</div>
-        <div className="toggle-row">
-          <button
-            className={`toggle-btn ${tel.scenario_mode === 'auto' ? 'active' : ''}`}
-            onClick={() => p.onScenarioMode('auto')}
-          >
-            AUTO
-          </button>
-          <button
-            className={`toggle-btn ${tel.scenario_mode === 'manual' ? 'active' : ''}`}
-            onClick={() => p.onScenarioMode('manual')}
-          >
-            MANUAL
-          </button>
-        </div>
-        <div className="toggle-hint">
-          {tel.scenario_mode === 'auto'
-            ? 'AUTO · 시나리오가 자동 진행됩니다 (시연용).'
-            : 'MANUAL · APPROVE 단계에서 운용자 결정 대기.'}
-        </div>
-      </div>
 
       <div className="panel-section">
         <div className="panel-label">PAYLOAD</div>
@@ -121,8 +103,8 @@ export default function RightPanel(p: Props) {
           </div>
           <div className="row">
             <span className="lbl">BATTERY</span>
-            <span className="val green">
-              {u10?.battery?.remaining_pct?.toFixed(1) ?? '—'}%
+            <span className={`val ${batteryClass}`}>
+              {batteryPct?.toFixed(1) ?? '—'}%
             </span>
           </div>
           <div className="row">
@@ -141,13 +123,6 @@ export default function RightPanel(p: Props) {
 
       {/* Status log fills remaining vertical space */}
       <StatusLog tel={tel} />
-
-      {/* Action area pinned to bottom */}
-      <ActionButtons
-        tel={tel}
-        onApprove={p.onApprove}
-        onDismiss={p.onDismiss}
-      />
     </aside>
   )
 }

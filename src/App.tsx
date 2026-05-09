@@ -30,17 +30,15 @@ import {
 } from 'cesium'
 
 import { initialState, INCHEON } from './mockData'
-import { operatorApprove, operatorDismiss, PHASE_SCHEDULE, SCENARIO_TOTAL_MS, tick } from './scenario'
+import { TelRefContext } from './telRefContext'
+import { PHASE_SCHEDULE, SCENARIO_TOTAL_MS, tick } from './scenario'
 import { launchPathBezier3D, u10HeadingDeg, u10Position3D } from './u10Trajectory'
-import type { CUASTelemetry, KillChainPhase, PayloadMode, ScenarioMode } from './types'
+import type { CUASTelemetry, KillChainPhase, PayloadMode } from './types'
 import {
   CAPTURE_ICON,
   FPV_ICON,
-  GCS_ICON,
-  MC_ICON,
   RADAR_ICON,
   U10_ICON,
-  VIP_ICON,
 } from './icons'
 
 // HUD components reused from the 2D mockup
@@ -67,19 +65,45 @@ if (TOKEN) Ion.defaultAccessToken = TOKEN
 // faster tick — keeping this conservative for now.
 const TICK_MS = 250
 
-// ── Camera fly-in target ─────────────────────────────────────
-// Wider establishing shot: VIP centered with the full ingress corridor
-// visible — adversary spawn point (~2.5km W of VIP, near Yanghwa Bridge)
-// fits comfortably in the upper-left, capture point in the middle, GCS
-// pad on the right. Operator sees the threat coming the moment the
-// scenario starts.
-const CAMERA_DEST = Cartesian3.fromDegrees(
-  INCHEON.vip_lon + 0.014,         // ~1.2km E
-  INCHEON.vip_lat - 0.024,         // ~2.7km S
-  2600,                             // 2.6km alt
-)
-const CAMERA_HEADING = CesiumMath.toRadians(-28)  // NNW · faces VIP and the corridor
-const CAMERA_PITCH = CesiumMath.toRadians(-40)
+// ── Camera preset ────────────────────────────────────────────
+// Single TACTICAL view — operational top-down. North-up, -75° pitch
+// (high-oblique not strict nadir, so altitude leaders still read).
+// VIP centered exactly: camera position is groundD = alt/tan(|pitch|)
+// meters away along the back-bearing.
+const M_PER_DEG_LAT_VIEW = 111_320
+function vipCenteredDestination(headingDeg: number, pitchDeg: number, altMeters: number) {
+  const groundD = altMeters / Math.tan((Math.abs(pitchDeg) * Math.PI) / 180)
+  const backBearingRad = ((headingDeg + 180) * Math.PI) / 180
+  const dy_m = Math.cos(backBearingRad) * groundD
+  const dx_m = Math.sin(backBearingRad) * groundD
+  const dLat = dy_m / M_PER_DEG_LAT_VIEW
+  const dLon =
+    dx_m / (M_PER_DEG_LAT_VIEW * Math.cos((INCHEON.vip_lat * Math.PI) / 180))
+  return Cartesian3.fromDegrees(
+    INCHEON.vip_lon + dLon,
+    INCHEON.vip_lat + dLat,
+    altMeters,
+  )
+}
+
+const TACTICAL_HEADING_DEG = 0
+const TACTICAL_PITCH_DEG = -75
+// Bumped from 5km → 7km so the full ingress corridor + Yeouido context
+// + spawn annulus all fit at default zoom. User can still mouse-zoom in.
+const TACTICAL_ALT_M = 7000
+
+const TACTICAL_PRESET = {
+  destination: vipCenteredDestination(
+    TACTICAL_HEADING_DEG,
+    TACTICAL_PITCH_DEG,
+    TACTICAL_ALT_M,
+  ),
+  orientation: {
+    heading: CesiumMath.toRadians(TACTICAL_HEADING_DEG),
+    pitch: CesiumMath.toRadians(TACTICAL_PITCH_DEG),
+    roll: 0,
+  },
+}
 
 // ── Resium <Viewer> contextOptions · MUST be a stable reference ─
 // Resium treats `contextOptions` as a read-only prop — every reference
@@ -100,19 +124,12 @@ const VIEWER_CONTEXT_OPTIONS = {
   },
 }
 
-function SceneInit({ onReady, flyKey }: { onReady: () => void; flyKey: number }) {
+function SceneInit({ onReady }: { onReady: () => void }) {
   const { viewer } = useCesium()
   useEffect(() => {
     if (!viewer) return
     viewer.scene.globe.depthTestAgainstTerrain = true
     viewer.cesiumWidget.creditContainer.setAttribute('style', 'display:none')
-
-    // ── Camera fly-in ────────────────────────────────────────
-    viewer.camera.setView({
-      destination: CAMERA_DEST,
-      orientation: { heading: CAMERA_HEADING, pitch: CAMERA_PITCH, roll: 0 },
-    })
-    viewer.scene.requestRender()
 
     // ── Performance · cap render resolution ─────────────────
     viewer.useBrowserRecommendedResolution = false
@@ -126,9 +143,6 @@ function SceneInit({ onReady, flyKey }: { onReady: () => void; flyKey: number })
       viewer.scene.postProcessStages.fxaa.enabled = false
     }
     if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = false
-
-    // ── FPS diagnostic overlay (top-left of the canvas) ─────
-    viewer.scene.debugShowFramesPerSecond = true
 
     // Tone the satellite imagery LAYER (not the canvas filter), so the
     // map fades to a dim console backdrop while entities/markers stay
@@ -149,18 +163,87 @@ function SceneInit({ onReady, flyKey }: { onReady: () => void; flyKey: number })
     return () => {
       onAdd()
     }
-  }, [viewer, onReady, flyKey])
+  }, [viewer, onReady])
+  return null
+}
+
+// CompassWidget · north-keyed compass that rotates inversely to the
+// camera heading, so the north arrow always points to true north on
+// screen. Reads viewer.camera.heading every frame via postRender.
+function CompassWidget() {
+  const { viewer } = useCesium()
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!viewer) return
+    const update = () => {
+      if (!ref.current) return
+      // viewer.camera.heading is in radians, clockwise from north.
+      // We rotate the widget by the negative so north stays pinned up.
+      const headingDeg = CesiumMath.toDegrees(viewer.camera.heading)
+      ref.current.style.transform = `rotate(${-headingDeg}deg)`
+    }
+    update()
+    const handle = viewer.scene.postRender.addEventListener(update)
+    return () => { handle() }
+  }, [viewer])
+  return (
+    <div className="compass-widget" ref={ref} aria-hidden>
+      <svg viewBox="-32 -32 64 64" width="56" height="56">
+        {/* Outer ring */}
+        <circle cx="0" cy="0" r="28" fill="rgba(7,9,13,0.55)" stroke="#00FFBC" strokeWidth="1.2" />
+        {/* Cardinal ticks */}
+        <line x1="0" y1="-28" x2="0" y2="-22" stroke="#00FFBC" strokeWidth="1.5" />
+        <line x1="28" y1="0" x2="22" y2="0" stroke="#00FFBC" strokeWidth="1" opacity="0.55" />
+        <line x1="0" y1="28" x2="0" y2="22" stroke="#00FFBC" strokeWidth="1" opacity="0.55" />
+        <line x1="-28" y1="0" x2="-22" y2="0" stroke="#00FFBC" strokeWidth="1" opacity="0.55" />
+        {/* North needle (filled triangle) */}
+        <polygon points="0,-18 -5,4 5,4" fill="#00FFBC" />
+        <polygon points="0,18 -4,-2 4,-2" fill="#00FFBC" opacity="0.35" />
+        {/* Cardinal labels */}
+        <text x="0" y="-9" fill="#0a0d12" fontSize="9" fontFamily="monospace" fontWeight="700" textAnchor="middle">N</text>
+        <text x="17" y="3" fill="#00FFBC" fontSize="7" fontFamily="monospace" textAnchor="middle">E</text>
+        <text x="0" y="14" fill="#00FFBC" fontSize="7" fontFamily="monospace" textAnchor="middle">S</text>
+        <text x="-17" y="3" fill="#00FFBC" fontSize="7" fontFamily="monospace" textAnchor="middle">W</text>
+      </svg>
+    </div>
+  )
+}
+
+// CameraController · drives the TACTICAL preset on first mount and
+// resets to it on flyKey++ (F-key / FLY TO VIP button).
+function CameraController({ flyKey }: { flyKey: number }) {
+  const { viewer } = useCesium()
+  const initRef = useRef(false)
+  const prevFlyKeyRef = useRef(flyKey)
+
+  useEffect(() => {
+    if (!viewer) return
+    if (!initRef.current) {
+      viewer.camera.setView(TACTICAL_PRESET)
+      viewer.scene.requestRender()
+      initRef.current = true
+      prevFlyKeyRef.current = flyKey
+      return
+    }
+    if (prevFlyKeyRef.current !== flyKey) {
+      viewer.camera.setView(TACTICAL_PRESET)
+      viewer.scene.requestRender()
+      prevFlyKeyRef.current = flyKey
+    }
+  }, [viewer, flyKey])
+
   return null
 }
 
 export default function App() {
   // ── state ──────────────────────────────────────────────────
-  const [tel, setTel] = useState<CUASTelemetry>(() => initialState('auto', 'net_gun'))
+  const [tel, setTel] = useState<CUASTelemetry>(() => initialState('net_gun'))
   const [running, setRunning] = useState(false)
   const [flashPhase, setFlashPhase] = useState<KillChainPhase | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [ready, setReady] = useState(false)
   const [flyKey, setFlyKey] = useState(0)
+  const [speedMultiplier, setSpeedMultiplier] = useState<1 | 2 | 4>(1)
   const lastTickRef = useRef(performance.now())
   const prevPhaseRef = useRef<KillChainPhase>(tel.kill_chain.phase)
   const recordingRef = useRef(false)
@@ -173,10 +256,13 @@ export default function App() {
       const now = performance.now()
       const dt = now - lastTickRef.current
       lastTickRef.current = now
-      setTel((prev) => tick(prev, dt, true))
+      // 2× speed compresses time without changing render rate — we
+      // multiply dt rather than the interval frequency so React's tick
+      // (and HUD update cadence) stays at 4Hz regardless of mode.
+      setTel((prev) => tick(prev, dt * speedMultiplier, true))
     }, TICK_MS)
     return () => window.clearInterval(id)
-  }, [running])
+  }, [running, speedMultiplier])
 
   // (fit-to-viewport scale removed · the layout is now fluid: .app-canvas
   // is 100vw × 100vh and the Cesium center cell takes whatever's left
@@ -192,20 +278,17 @@ export default function App() {
   const onPause = useCallback(() => setRunning(false), [])
   const onReset = useCallback(() => {
     setRunning(false)
-    setTel((t) => initialState(t.scenario_mode, t.payload_mode))
-  }, [])
-  const onScenarioMode = useCallback((m: ScenarioMode) => {
-    setTel((t) => ({ ...t, scenario_mode: m }))
+    setTel((t) => initialState(t.payload_mode))
   }, [])
   const onPayloadMode = useCallback((p: PayloadMode) => {
     setTel((t) => ({ ...t, payload_mode: p }))
   }, [])
-  const onApprove = useCallback(() => setTel((t) => operatorApprove(t)), [])
-  const onDismiss = useCallback(() => {
-    setTel((t) => operatorDismiss(t))
-    setRunning(false)
-  }, [])
   const onFlyTo = useCallback(() => setFlyKey((k) => k + 1), [])
+  // Speed cycles 1× → 2× → 4× → 1×. Single key/button for all three.
+  const onCycleSpeed = useCallback(
+    () => setSpeedMultiplier((s) => (s === 1 ? 2 : s === 2 ? 4 : 1)),
+    [],
+  )
 
   const onRecord = useCallback(async () => {
     if (recordingRef.current) return
@@ -246,7 +329,7 @@ export default function App() {
       if (recorder.state === 'recording') recorder.stop()
     }
     recorder.start()
-    setTel((t) => initialState(t.scenario_mode, t.payload_mode))
+    setTel((t) => initialState(t.payload_mode))
     setRunning(false)
     window.setTimeout(() => setRunning(true), 600)
     window.setTimeout(() => {
@@ -276,19 +359,16 @@ export default function App() {
       switch (e.code) {
         case 'Space': e.preventDefault(); running ? onPause() : onStart(); break
         case 'KeyR': onReset(); break
-        case 'KeyA': setTel((t) => ({ ...t, scenario_mode: t.scenario_mode === 'auto' ? 'manual' : 'auto' })); break
         case 'KeyN': setTel((t) => ({ ...t, payload_mode: 'net_gun' })); break
         case 'KeyS': setTel((t) => ({ ...t, payload_mode: 'shotgun' })); break
         case 'KeyG': onRecord(); break
         case 'KeyF': onFlyTo(); break
-        case 'Enter':
-          if (tel.scenario_mode === 'manual' && tel.kill_chain.phase === 'approve') onApprove()
-          break
+        case 'KeyD': onCycleSpeed(); break
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [running, tel.scenario_mode, tel.kill_chain.phase, onStart, onPause, onReset, onApprove, onRecord, onFlyTo])
+  }, [running, onStart, onPause, onReset, onRecord, onFlyTo, onCycleSpeed])
 
   // ── derived positions ──────────────────────────────────────
   const phase = tel.kill_chain.phase
@@ -310,19 +390,21 @@ export default function App() {
   useEffect(() => { telRef.current = tel }, [tel])
 
   // Static fallbacks for the brief moment before tel is populated
-  // (and so pre-mounted hidden entities have a valid position).
+  // (and so pre-mounted hidden entities have a valid position). Using
+  // VIP coords — entity is hidden when these are read, so the value
+  // just needs to be a valid Cartesian3.
   const PLACEHOLDER_POS = useMemo(
-    () => Cartesian3.fromDegrees(INCHEON.threat_ingress_lon, INCHEON.threat_ingress_lat, 85),
+    () => Cartesian3.fromDegrees(INCHEON.vip_lon, INCHEON.vip_lat, 85),
     [],
   )
   const PLACEHOLDER_CAPTURE = useMemo(
-    () => Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0117, INCHEON.vip_lat + 0.001, 0),
+    () => Cartesian3.fromDegrees(INCHEON.vip_lon, INCHEON.vip_lat, 0),
     [],
   )
   const PLACEHOLDER_TRAIL = useMemo(
     () => [
-      Cartesian3.fromDegrees(INCHEON.threat_ingress_lon, INCHEON.threat_ingress_lat, 85),
-      Cartesian3.fromDegrees(INCHEON.threat_ingress_lon + 0.0001, INCHEON.threat_ingress_lat, 85),
+      Cartesian3.fromDegrees(INCHEON.vip_lon, INCHEON.vip_lat, 85),
+      Cartesian3.fromDegrees(INCHEON.vip_lon + 0.0001, INCHEON.vip_lat, 85),
     ],
     [],
   )
@@ -369,7 +451,9 @@ export default function App() {
     [PLACEHOLDER_POS],
   )
 
-  // Threat ingress trail polyline (origin → current track position)
+  // Threat ingress trail polyline (origin → current track position).
+  // Origin is the per-scenario randomized spawn point so the trail
+  // matches the actual approach vector (not the canonical center).
   const threatTrailProperty = useMemo(
     () =>
       new CallbackProperty(() => {
@@ -378,7 +462,7 @@ export default function App() {
         const trk = trackId ? t.tracks[trackId] : null
         if (!trk) return PLACEHOLDER_TRAIL
         return [
-          Cartesian3.fromDegrees(INCHEON.threat_ingress_lon, INCHEON.threat_ingress_lat, 85),
+          Cartesian3.fromDegrees(t.threat_origin.lon, t.threat_origin.lat, 85),
           Cartesian3.fromDegrees(trk.lon_deg, trk.lat_deg, trk.alt_m_agl),
         ]
       }, false),
@@ -396,9 +480,12 @@ export default function App() {
       const t = telRef.current
       const s = t.intercept_solution
       if (!s || t.kill_chain.phase !== 'launch') return PLACEHOLDER_TRAIL
-      const key = `${s.capture_lat_deg},${s.capture_lon_deg}`
+      // Cache key includes threat_origin since the swing endpoint is
+      // 6 o'clock behind the threat at tail-entry time, which depends
+      // on threat origin (not just capture point).
+      const key = `${t.threat_origin.lat},${t.threat_origin.lon},${s.capture_lat_deg},${s.capture_lon_deg}`
       if (key !== cachedKey || !cachedPath) {
-        cachedPath = launchPathBezier3D([s.capture_lat_deg, s.capture_lon_deg], 32).map(([la, lo, al]) =>
+        cachedPath = launchPathBezier3D(t, 32).map(([la, lo, al]) =>
           Cartesian3.fromDegrees(lo, la, al),
         )
         cachedKey = key
@@ -406,12 +493,6 @@ export default function App() {
       return cachedPath
     }, false)
   }, [PLACEHOLDER_TRAIL])
-
-  // capture point only changes per-scenario (when sol becomes available)
-  const capturePos = useMemo(() => {
-    if (!sol) return null
-    return Cartesian3.fromDegrees(sol.capture_lon_deg, sol.capture_lat_deg, sol.capture_alt_m_agl)
-  }, [sol?.capture_lon_deg, sol?.capture_lat_deg, sol?.capture_alt_m_agl])
 
   // ── Engagement effect (capture phase) ─────────────────────────
   // Visible for 1.5s after capture phase begins. Net gun: tighter, slower
@@ -580,24 +661,6 @@ export default function App() {
       }),
     [],
   )
-  const mc01LeaderMaterial = useMemo(
-    () =>
-      new PolylineDashMaterialProperty({
-        color: Color.fromCssColorString('#9b6bff').withAlpha(0.55),
-        dashLength: 12,
-      }),
-    [],
-  )
-
-  // MC-01 is at a fixed orbit position — positions array is constant.
-  const mc01LeaderPositions = useMemo(
-    () => [
-      Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 45),
-      Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 0),
-    ],
-    [],
-  )
-
   // Ground tick (small ring at the foot of the leader) — gives the eye
   // a "this is the ground point under the airborne object" anchor.
   const u10GroundTickPosition = useMemo(
@@ -709,6 +772,7 @@ export default function App() {
   const u10AltDisplay = u10Position3D(tel)[2]
 
   return (
+    <TelRefContext.Provider value={telRef}>
     <div className="app-canvas">
       <TopBar tel={tel} running={running} />
 
@@ -733,7 +797,9 @@ export default function App() {
             // Reference must be stable — see VIEWER_CONTEXT_OPTIONS comment.
             contextOptions={VIEWER_CONTEXT_OPTIONS}
           >
-            <SceneInit onReady={onSceneReady} flyKey={flyKey} />
+            <SceneInit onReady={onSceneReady} />
+            <CameraController flyKey={flyKey} />
+            <CompassWidget />
             <CesiumScaleBar />
             <RadarScanPulse />
 
@@ -743,43 +809,81 @@ export default function App() {
                 the marker reads as suspended above its ground point. Labels
                 are pushed further out so they don't crowd the marker. */}
 
-            {/* GCS + RADAR (collocated · same physical pad). Outer ring +
-                center dot + label, three entities sharing one position so
-                Resium doesn't clobber duplicate graphics types. Radar pulse
-                still emanates from this position via <RadarScanPulse>. */}
-            <Entity name="GCS-RADAR-ring" position={Cartesian3.fromDegrees(INCHEON.u10_lon, INCHEON.u10_lat, 0)}>
-              <EllipseGraphics
-                semiMajorAxis={28}
-                semiMinorAxis={28}
-                height={1}
-                material={Color.fromCssColorString('#5fb6ff').withAlpha(0.18)}
-                outline
-                outlineColor={Color.fromCssColorString('#5fb6ff').withAlpha(0.9)}
-                outlineWidth={2}
-              />
-            </Entity>
-            <Entity name="GCS-RADAR-dot" position={Cartesian3.fromDegrees(INCHEON.u10_lon, INCHEON.u10_lat, 0)}>
-              <EllipseGraphics
-                semiMajorAxis={4}
-                semiMinorAxis={4}
-                height={1}
-                material={Color.fromCssColorString('#5fb6ff')}
-              />
-              <LabelGraphics
-                text="GCS · RADAR"
-                font='bold 13px "Montserrat"'
-                fillColor={Color.fromCssColorString('#5fb6ff')}
-                outlineColor={Color.BLACK}
-                outlineWidth={3}
-                style={LabelStyle.FILL_AND_OUTLINE}
-                pixelOffset={new Cartesian2(70, -28)}
-                showBackground
-                backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.85)')}
-                heightReference={HeightReference.CLAMP_TO_GROUND}
-              />
-            </Entity>
+            {/* GCS + RADAR · co-located on the same operating site as
+                AB-U10 standby pad but offset ~100m east so labels and
+                markers don't stack on top of each other. Same pole +
+                label-on-top idiom as VIP. Radar pulse animation still
+                emanates from this position via <RadarScanPulse>. */}
+            {(() => {
+              const radarLon = INCHEON.u10_lon + 0.00115  // ~100m E of standby pad
+              const radarLat = INCHEON.u10_lat
+              return (
+                <>
+                  <Entity name="GCS-RADAR-ring" position={Cartesian3.fromDegrees(radarLon, radarLat, 0)}>
+                    <EllipseGraphics
+                      semiMajorAxis={28}
+                      semiMinorAxis={28}
+                      height={1}
+                      material={Color.fromCssColorString('#5fb6ff').withAlpha(0.18)}
+                      outline
+                      outlineColor={Color.fromCssColorString('#5fb6ff').withAlpha(0.9)}
+                      outlineWidth={2}
+                    />
+                  </Entity>
+                  <Entity name="GCS-RADAR-dot" position={Cartesian3.fromDegrees(radarLon, radarLat, 0)}>
+                    <EllipseGraphics
+                      semiMajorAxis={4}
+                      semiMinorAxis={4}
+                      height={1}
+                      material={Color.fromCssColorString('#5fb6ff')}
+                    />
+                  </Entity>
+                  <Entity
+                    name="GCS-RADAR-icon"
+                    position={Cartesian3.fromDegrees(radarLon, radarLat, 0)}
+                  >
+                    <BillboardGraphics
+                      image={RADAR_ICON}
+                      width={56}
+                      height={82}
+                      verticalOrigin={VerticalOrigin.BOTTOM}
+                      heightReference={HeightReference.CLAMP_TO_GROUND}
+                    />
+                  </Entity>
+                  <Entity name="GCS-RADAR-pole">
+                    <PolylineGraphics
+                      positions={[
+                        Cartesian3.fromDegrees(radarLon, radarLat, 0),
+                        Cartesian3.fromDegrees(radarLon, radarLat, 100),
+                      ]}
+                      width={2.5}
+                      material={Color.fromCssColorString('#5fb6ff').withAlpha(0.85)}
+                    />
+                  </Entity>
+                  <Entity
+                    name="GCS-RADAR-label"
+                    position={Cartesian3.fromDegrees(radarLon, radarLat, 100)}
+                  >
+                    <LabelGraphics
+                      text="GCS · RADAR"
+                      font='bold 13px "Montserrat"'
+                      fillColor={Color.fromCssColorString('#5fb6ff')}
+                      outlineColor={Color.BLACK}
+                      outlineWidth={3}
+                      style={LabelStyle.FILL_AND_OUTLINE}
+                      pixelOffset={new Cartesian2(0, -14)}
+                      showBackground
+                      backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.9)')}
+                    />
+                  </Entity>
+                </>
+              )
+            })()}
 
-            {/* VIP · ground installation, ring-on-the-map idiom */}
+            {/* VIP · ground ring + dot + vertical pole + label-on-top.
+                The pole gives the eye a clear "this point belongs to
+                this label" connection — same idiom as a flag pole on
+                a protected asset. */}
             <Entity name="VIP-ring" position={Cartesian3.fromDegrees(INCHEON.vip_lon, INCHEON.vip_lat, 0)}>
               <EllipseGraphics
                 semiMajorAxis={32}
@@ -798,6 +902,21 @@ export default function App() {
                 height={1}
                 material={Color.fromCssColorString('#00FFBC')}
               />
+            </Entity>
+            <Entity name="VIP-pole">
+              <PolylineGraphics
+                positions={[
+                  Cartesian3.fromDegrees(INCHEON.vip_lon, INCHEON.vip_lat, 0),
+                  Cartesian3.fromDegrees(INCHEON.vip_lon, INCHEON.vip_lat, 100),
+                ]}
+                width={2.5}
+                material={Color.fromCssColorString('#00FFBC').withAlpha(0.85)}
+              />
+            </Entity>
+            <Entity
+              name="VIP-label"
+              position={Cartesian3.fromDegrees(INCHEON.vip_lon, INCHEON.vip_lat, 100)}
+            >
               <LabelGraphics
                 text="VIP · PROTECTED"
                 font='bold 13px "Montserrat"'
@@ -805,53 +924,9 @@ export default function App() {
                 outlineColor={Color.BLACK}
                 outlineWidth={3}
                 style={LabelStyle.FILL_AND_OUTLINE}
-                pixelOffset={new Cartesian2(-78, -28)}
+                pixelOffset={new Cartesian2(0, -14)}
                 showBackground
-                backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.85)')}
-                heightReference={HeightReference.CLAMP_TO_GROUND}
-              />
-            </Entity>
-
-            {/* MC-01 · multicopter overwatch + altitude leader (45m) */}
-            <Entity name="MC-01-leader">
-              <PolylineGraphics
-                positions={mc01LeaderPositions}
-                width={1.5}
-                material={mc01LeaderMaterial}
-              />
-            </Entity>
-            <Entity
-              name="MC-01-ground-tick"
-              position={Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 0)}
-            >
-              <EllipseGraphics
-                semiMajorAxis={6}
-                semiMinorAxis={6}
-                height={1}
-                material={Color.fromCssColorString('#9b6bff').withAlpha(0.18)}
-                outline
-                outlineColor={Color.fromCssColorString('#9b6bff').withAlpha(0.7)}
-                outlineWidth={1}
-              />
-            </Entity>
-            <Entity name="MC-01" position={Cartesian3.fromDegrees(INCHEON.vip_lon - 0.0006, INCHEON.vip_lat + 0.0008, 45)}>
-              <BillboardGraphics
-                image={MC_ICON}
-                width={56}
-                height={81}
-                verticalOrigin={VerticalOrigin.CENTER}
-                heightReference={HeightReference.RELATIVE_TO_GROUND}
-              />
-              <LabelGraphics
-                text="MC-01 · 45m"
-                font='bold 13px "Montserrat"'
-                fillColor={Color.fromCssColorString('#9b6bff')}
-                outlineColor={Color.BLACK}
-                outlineWidth={3}
-                style={LabelStyle.FILL_AND_OUTLINE}
-                pixelOffset={new Cartesian2(80, -56)}
-                showBackground
-                backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.85)')}
+                backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.9)')}
               />
             </Entity>
 
@@ -907,7 +982,7 @@ export default function App() {
                 outlineColor={Color.BLACK}
                 outlineWidth={3}
                 style={LabelStyle.FILL_AND_OUTLINE}
-                pixelOffset={new Cartesian2(78, -38)}
+                pixelOffset={new Cartesian2(0, -50)}
                 showBackground
                 backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.9)')}
               />
@@ -968,7 +1043,7 @@ export default function App() {
                 outlineColor={Color.BLACK}
                 outlineWidth={3}
                 style={LabelStyle.FILL_AND_OUTLINE}
-                pixelOffset={new Cartesian2(86, -64)}
+                pixelOffset={new Cartesian2(0, -56)}
                 showBackground
                 backgroundColor={Color.fromCssColorString('rgba(0,0,0,0.92)')}
               />
@@ -1069,7 +1144,7 @@ export default function App() {
               show={!!sol && (phase === 'approve' || phase === 'launch')}
             >
               <LabelGraphics
-                text={`예상 격추 ZONE · ${tel.payload_mode === 'net_gun' ? 'NET' : 'SHOT'}`}
+                text={`예상 격추 ZONE · ${tel.payload_mode === 'net_gun' ? 'NET' : 'SHOT'}\n${tel.capture_point.name} · MIN COLLATERAL (${tel.capture_point.type.toUpperCase()})`}
                 font='10px "Montserrat"'
                 fillColor={Color.fromCssColorString(
                   tel.payload_mode === 'net_gun' ? '#ffb020' : '#ff7a3d',
@@ -1079,46 +1154,19 @@ export default function App() {
                 style={LabelStyle.FILL_AND_OUTLINE}
                 pixelOffset={new Cartesian2(0, 0)}
                 showBackground
-                backgroundColor={Color.fromCssColorString('rgba(7,9,13,0.8)')}
+                backgroundColor={Color.fromCssColorString('rgba(7,9,13,0.85)')}
               />
             </Entity>
 
-            {/* Engagement effect · NET / SHOTGUN expanding ring at the
-                threat's position the moment AB-U10 fires.
-                  - net_gun  : amber (#ffb020), tighter, slower expansion (~25m peak)
-                  - shotgun  : orange (#ff7a3d), wider, faster expansion (~70m peak)
-                Fades out over 1.5s. Pre-mounted; show toggles on capture phase. */}
-            {/* Ground footprint ring · payload-coloured, expanding+fading.
-                Drawn at h=0 so it reads from the top-down camera. */}
-            <Entity
-              name="engagement-effect-ground"
-              position={
-                sol
-                  ? Cartesian3.fromDegrees(sol.capture_lon_deg, sol.capture_lat_deg, 0)
-                  : PLACEHOLDER_CAPTURE
-              }
-              show={!!sol && phase === 'capture'}
-            >
-              <EllipseGraphics
-                semiMajorAxis={engagementRadius as unknown as number}
-                semiMinorAxis={engagementRadius as unknown as number}
-                material={engagementMaterial}
-                height={1}
-                outline
-                outlineColor={engagementOutlineColor as unknown as Color}
-                outlineWidth={tel.payload_mode === 'net_gun' ? 2 : 4}
-              />
-            </Entity>
-
-            {/* Mid-air burst ring · same color, drawn at the threat altitude
-                so the explosion/net cloud is visible from the side too. */}
+            {/* Engagement effect · NET / SHOTGUN expanding ring centered
+                on the threat's CURRENT 3D position — falls with the drone
+                so the net mesh / explosion stays attached to the airframe
+                instead of looking like it's fired down at the ground.
+                  - net_gun  : amber (#ffb020), tighter (~25m peak)
+                  - shotgun  : orange (#ff7a3d), wider (~70m peak) */}
             <Entity
               name="engagement-effect-air"
-              position={
-                sol
-                  ? Cartesian3.fromDegrees(sol.capture_lon_deg, sol.capture_lat_deg, sol.capture_alt_m_agl)
-                  : PLACEHOLDER_CAPTURE
-              }
+              position={threatPositionProperty as unknown as Cartesian3}
               show={!!sol && phase === 'capture'}
             >
               <EllipseGraphics
@@ -1225,6 +1273,16 @@ export default function App() {
             </div>
           )}
 
+          {/* Speed cycle button (left of fly button) — 1× / 2× / 4× */}
+          <button
+            type="button"
+            className={`cesium-speed-btn ${speedMultiplier !== 1 ? 'is-active' : ''}`}
+            onClick={onCycleSpeed}
+            title="시뮬레이션 속도 토글 1× → 2× → 4× (D)"
+          >
+            {speedMultiplier}× SPEED
+          </button>
+
           {/* Fly-to-VIP button (bottom-right of map cell) */}
           <button className="cesium-fly-btn" onClick={onFlyTo} title="여의도 카메라 fly-in 재실행 (F)">
             ↻ FLY TO VIP
@@ -1239,13 +1297,10 @@ export default function App() {
           tel={tel}
           running={running}
           isRecording={isRecording}
-          onScenarioMode={onScenarioMode}
           onPayloadMode={onPayloadMode}
           onStart={onStart}
           onPause={onPause}
           onReset={onReset}
-          onApprove={onApprove}
-          onDismiss={onDismiss}
           onRecord={onRecord}
         />
       </main>
@@ -1264,5 +1319,6 @@ export default function App() {
       {/* Debrief modal */}
       {phase === 'report' && <DebriefModal tel={tel} onReset={onReset} />}
     </div>
+    </TelRefContext.Provider>
   )
 }

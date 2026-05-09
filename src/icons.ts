@@ -99,13 +99,34 @@ export const MC_ICON = dataUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox=
   </g>
 </svg>`)
 
-// Radar — blue triangle
+// Radar — parabolic dish on a truss tower with feed horn + sweep beam
 export const RADAR_ICON = dataUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 116">
   <defs>${GLOW_FILTER}</defs>
-  ${footAndLeader('#3b8eff')}
+  ${footAndLeader('#5fb6ff')}
   <g filter="url(#glow)">
-    <polygon points="40,8 64,52 16,52" fill="rgba(59,142,255,0.4)" stroke="#5fb6ff" stroke-width="2.5"/>
-    <circle cx="40" cy="38" r="5" fill="#5fb6ff" stroke="white" stroke-width="1.5"/>
+    <!-- Tower (truss with cross-bracing) -->
+    <polygon points="32,58 48,58 44,32 36,32" fill="rgba(95,182,255,0.20)" stroke="#5fb6ff" stroke-width="1.4"/>
+    <line x1="32" y1="58" x2="44" y2="32" stroke="#5fb6ff" stroke-width="0.6" opacity="0.6"/>
+    <line x1="48" y1="58" x2="36" y2="32" stroke="#5fb6ff" stroke-width="0.6" opacity="0.6"/>
+    <line x1="34" y1="48" x2="46" y2="48" stroke="#5fb6ff" stroke-width="0.6" opacity="0.5"/>
+    <line x1="35" y1="40" x2="45" y2="40" stroke="#5fb6ff" stroke-width="0.6" opacity="0.5"/>
+    <!-- Pivot mount on top of tower -->
+    <circle cx="40" cy="32" r="2.5" fill="#5fb6ff"/>
+    <line x1="40" y1="32" x2="40" y2="24" stroke="#5fb6ff" stroke-width="2"/>
+    <!-- Parabolic dish (curved arc filled) -->
+    <path d="M 12 26 Q 40 -2 68 26 L 60 24 Q 40 10 20 24 Z"
+          fill="rgba(95,182,255,0.45)" stroke="#5fb6ff" stroke-width="2.5" stroke-linejoin="round"/>
+    <!-- Dish ribs hint at parabolic curvature -->
+    <line x1="20" y1="22" x2="24" y2="14" stroke="#5fb6ff" stroke-width="0.8" opacity="0.6"/>
+    <line x1="40" y1="20" x2="40" y2="6" stroke="#5fb6ff" stroke-width="0.8" opacity="0.6"/>
+    <line x1="60" y1="22" x2="56" y2="14" stroke="#5fb6ff" stroke-width="0.8" opacity="0.6"/>
+    <!-- Feed horn dipole at dish focal point -->
+    <line x1="40" y1="14" x2="40" y2="6" stroke="#5fb6ff" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="40" cy="5" r="2.5" fill="#5fb6ff" stroke="white" stroke-width="0.8"/>
+    <!-- Sweep beam fanning from feed (suggests scanning) -->
+    <line x1="40" y1="5" x2="58" y2="-4" stroke="#5fb6ff" stroke-width="1" opacity="0.45" stroke-dasharray="2 2"/>
+    <line x1="40" y1="5" x2="68" y2="2" stroke="#5fb6ff" stroke-width="0.8" opacity="0.35" stroke-dasharray="2 2"/>
+    <line x1="40" y1="5" x2="22" y2="-4" stroke="#5fb6ff" stroke-width="1" opacity="0.45" stroke-dasharray="2 2"/>
   </g>
 </svg>`)
 

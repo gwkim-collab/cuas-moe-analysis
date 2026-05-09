@@ -9,6 +9,12 @@ export default function InterceptCard({ tel }: Props) {
   const probColor =
     sol.probability === 'high' ? 'green' : sol.probability === 'medium' ? 'amber' : 'red'
 
+  // ETA escalation · plenty of time = green, closing = amber, imminent = red.
+  const etaClass =
+    sol.eta_to_capture_s <= 10 ? 'red' :
+      sol.eta_to_capture_s <= 30 ? 'amber' :
+        'green'
+
   return (
     <div className="panel-section">
       <div className="panel-label" style={{ color: 'var(--green)' }}>
@@ -21,7 +27,7 @@ export default function InterceptCard({ tel }: Props) {
         </div>
         <div className="row">
           <span className="lbl">ETA</span>
-          <span className="val green">T+{sol.eta_to_capture_s}s</span>
+          <span className={`val ${etaClass}`}>T+{sol.eta_to_capture_s}s</span>
         </div>
         <div className="row">
           <span className="lbl">PROBABILITY</span>

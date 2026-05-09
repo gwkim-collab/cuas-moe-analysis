@@ -1,19 +1,16 @@
 import type { CUASTelemetry } from '../types'
 import RadarPPI from './cam/RadarPPI'
-import MultiCopterEO from './cam/MultiCopterEO'
 import U10FrontCam from './cam/U10FrontCam'
 
 interface Props { tel: CUASTelemetry }
 
 /**
- * Left rail · 3 stacked sensor panes.
+ * Left rail · 2 stacked sensor panes.
  *  1. RADAR PPI (Fortem R30)
- *  2. MC-01 EO/IR top-down
- *  3. AB-U10 forward EO
+ *  2. AB-U10 forward EO
  */
 export default function CameraStack({ tel }: Props) {
   const radarOnline = tel.vehicles[30]?.heartbeat != null
-  const mcOnline = tel.vehicles[20]?.heartbeat != null
   const u10Ready = tel.vehicles[10]?.heartbeat != null
   const phase = tel.kill_chain.phase
 
@@ -29,10 +26,6 @@ export default function CameraStack({ tel }: Props) {
     <div className="camera-stack">
       <CamPane title="RADAR · FORTEM R30" status="SCANNING" online={radarOnline}>
         <RadarPPI tel={tel} />
-      </CamPane>
-
-      <CamPane title="MC-01 · EO/IR (NADIR)" status="ORBITING · 45m" online={mcOnline}>
-        <MultiCopterEO tel={tel} />
       </CamPane>
 
       <CamPane

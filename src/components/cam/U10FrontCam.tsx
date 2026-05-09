@@ -1,5 +1,30 @@
 import type { CUASTelemetry } from '../../types'
 import { PHASE_SCHEDULE } from '../../scenario'
+import { u10Position, u10HeadingDeg, u10Altitude } from '../../u10Trajectory'
+import MiniSceneView from './MiniSceneView'
+
+// Bearing from (lat1, lon1) to (lat2, lon2) in degrees [0, 360).
+function bearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const φ1 = (lat1 * Math.PI) / 180
+  const φ2 = (lat2 * Math.PI) / 180
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180
+  const y = Math.sin(Δλ) * Math.cos(φ2)
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ)
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360
+}
+
+// Great-circle horizontal distance in meters.
+function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6_371_000
+  const φ1 = (lat1 * Math.PI) / 180
+  const φ2 = (lat2 * Math.PI) / 180
+  const dφ = ((lat2 - lat1) * Math.PI) / 180
+  const dλ = ((lon2 - lon1) * Math.PI) / 180
+  const a =
+    Math.sin(dφ / 2) ** 2 +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
+}
 
 interface Props { tel: CUASTelemetry }
 
@@ -24,43 +49,11 @@ export default function U10FrontCam({ tel }: Props) {
   const showLockOn = isFlying && track && track.ground_speed_m_s > 0
   const isAfterEngagement = phase === 'report'
 
-  // ── Launch progress (0..1) drives the camera dynamics ────────
-  // Used for pitch, roll (banking), and the AI box trajectory across
-  // the field of view as AB-U10 swings around behind the threat.
-  const launchProgress =
-    phase === 'launch'
-      ? Math.min(1, Math.max(0, (tel.scenario_clock_ms - 24_000) / 11_000))
-      : phase === 'capture' || phase === 'report'
-        ? 1
-        : 0
-
-  // Pitch: VTOL nose-up at takeoff (first 25%), gradual nose-down to
-  // level for cruise. Matches the staged altitude profile in u10Trajectory.
-  const pitchDeg =
-    phase === 'launch'
-      ? launchProgress < 0.25
-        ? 18 * (launchProgress / 0.25)             // 0 → 18° during VTOL
-        : launchProgress < 0.55
-          ? 18 - 18 * ((launchProgress - 0.25) / 0.30)  // 18° → 0° climb-out
-          : 0                                       // level cruise + turn
-      : 0
-
-  // Roll (banking): mostly flat during VTOL/climb-out (no horizontal
-  // motion to bank into), then a held coordinated bank during the level
-  // turn into 6-o'clock. Bank-in starts at ~55%, peaks at -22°, holds,
-  // bank-out at ~95%.
-  const rollDeg =
-    phase === 'launch'
-      ? launchProgress < 0.55
-        ? 0
-        : launchProgress < 0.65
-          ? -22 * ((launchProgress - 0.55) / 0.10)             // bank-in
-          : launchProgress < 0.92
-            ? -22                                              // hold turn
-            : -22 * (1 - (launchProgress - 0.92) / 0.08)       // bank-out
-      : 0
-
   // ── AI tracker box dynamics ──────────────────────────────────
+  // Pitch / roll / synthetic horizon are now handled by the Mini
+  // Cesium scene rendered behind us — the U10's pose translates into
+  // real camera motion against actual terrain. We only render the
+  // SVG overlay (track box, reticle, HUD) on top.
   // Behavioral approximation (not full 3D math): the threat ingresses
   // from NW relative to AB-U10's standby pad. As AB-U10 launches and
   // swings into the 6 o'clock approach, the target appears in the
@@ -68,26 +61,48 @@ export default function U10FrontCam({ tel }: Props) {
   // AI lock tightens. Captured (and centered) at engagement.
   const t = tel.scenario_clock_ms / 1000
 
+  // ── True U10→threat geometry (slant range + bearing + elevation) ─
+  // Box position, size, and AI lock state all derive from the actual
+  // 3D vector from the AB-U10 to the target — not from VIP→threat
+  // distance (which is what `track.range_m` is). This is what makes
+  // the tracker feel like it's actually looking at the drone vs.
+  // approximating its position.
+  let angularOffsetDeg = 0
+  let elevationDeg = 0
+  let slantRangeM = Infinity
+  if (track && (phase === 'launch' || phase === 'capture')) {
+    const u10ll = u10Position(tel)
+    const u10alt = u10Altitude(tel)
+    const u10Heading = u10HeadingDeg(tel)
+    const horizDist = haversineM(u10ll[0], u10ll[1], track.lat_deg, track.lon_deg)
+    const altDiff = track.alt_m_agl - u10alt
+    slantRangeM = Math.sqrt(horizDist * horizDist + altDiff * altDiff)
+    const threatBearing = bearingDeg(u10ll[0], u10ll[1], track.lat_deg, track.lon_deg)
+    // Normalize horizontal angle delta to [-180, 180]
+    angularOffsetDeg = ((threatBearing - u10Heading + 540) % 360) - 180
+    // Vertical angle: positive when threat is ABOVE U10 (atop the gimbal).
+    elevationDeg = (Math.atan2(altDiff, Math.max(1, horizDist)) * 180) / Math.PI
+  }
+
   // ── Range-based acquire ramp ────────────────────────────────
-  // The lock is driven by SLANT RANGE, not launch progress, so the
-  // tracker's behavior matches what an AI would actually do:
-  //   range > 1500m  : SEARCHING — no box (sensor noise only)
-  //   1500..900m     : ACQUIRING — flickering, sub-stable box
-  //   900..400m      : TRACKING  — solid lock building
-  //   < 400m         : LOCK      — full confidence
-  const rangeM = track?.range_m ?? Infinity
+  // Driven by the true slant range so the band thresholds reflect the
+  // actual sensor pickup distance.
+  //   slant > 1500m : SEARCHING — no box
+  //   1500..900m    : ACQUIRING — flickering, sub-stable box
+  //   900..400m     : TRACKING  — solid lock building
+  //   < 400m        : LOCK      — full confidence
   const acquireBase =
-    rangeM > 1500
+    slantRangeM > 1500
       ? 0
-      : rangeM > 900
-        ? 0.15 + 0.15 * ((1500 - rangeM) / 600)        // 0.15 → 0.30
-        : rangeM > 400
-          ? 0.30 + 0.65 * ((900 - rangeM) / 500)       // 0.30 → 0.95
+      : slantRangeM > 900
+        ? 0.15 + 0.15 * ((1500 - slantRangeM) / 600)
+        : slantRangeM > 400
+          ? 0.30 + 0.65 * ((900 - slantRangeM) / 500)
           : 1.0
   // Flicker during ACQUIRING — random-ish dropouts simulate the AI
   // re-acquiring as the target moves through clutter. Smooth from a
   // pair of sines so it stays deterministic.
-  const flickerActive = rangeM <= 1500 && rangeM > 900
+  const flickerActive = slantRangeM <= 1500 && slantRangeM > 900
   const flicker = flickerActive
     ? 0.5 + 0.5 * Math.sin(t * 9.3) * Math.cos(t * 4.1)
     : 1
@@ -98,45 +113,70 @@ export default function U10FrontCam({ tel }: Props) {
         ? 1
         : 0
 
-  // Lateral drift across the FOV.
-  // u=0 (launch start) : AB-U10 forward bearing ~282° (NW), threat bearing ~274° (W)
-  //                      → threat sits 8° LEFT of AB-U10's forward → upper-LEFT of FOV
-  // u=1 (capture)      : AB-U10 closing on threat 6 o'clock, both heading SE
-  //                      → threat dead center (locked from behind)
-  const easeOut = (x: number) => 1 - Math.pow(1 - x, 2)
-  const driftU = easeOut(launchProgress)
-  const driftX = (1 - driftU) * -95   // negative · upper-LEFT start (was +95, wrong side)
-  const driftY = (1 - driftU) * -55
+  // ── Project geometry onto screen ────────────────────────────
+  // Horizontal: angular offset from U10 forward → screen X.
+  // Vertical:   elevation angle → screen Y (negative = up on screen).
+  // FOV split is a typical EO gimbal: ~100° horizontal × ~70° vertical.
+  const FOV_HALF_H_DEG = 50
+  const FOV_HALF_V_DEG = 35
+  const driftXFromBearing = (angularOffsetDeg / FOV_HALF_H_DEG) * (VB_W / 2)
+  const driftYFromElevation = -(elevationDeg / FOV_HALF_V_DEG) * (VB_H / 2)
+  const driftX = Math.max(-VB_W * 0.45, Math.min(VB_W * 0.45, driftXFromBearing))
+  const driftY = Math.max(-VB_H * 0.45, Math.min(VB_H * 0.45, driftYFromElevation))
 
-  // Hand-tracking jitter — bigger early when the lock is loose, settles
-  // as we close in. Adds a little realism vs a perfectly centered box.
-  const jitterAmp = 6 * (1 - acquireRamp * 0.6)
-  const jitterX = Math.sin(t * 1.3) * jitterAmp + Math.sin(t * 4.2) * 1.5
-  const jitterY = Math.cos(t * 0.9) * (jitterAmp * 0.6) + Math.cos(t * 3.7) * 1.0
+  // ── Tracker jitter — minimal once locked ────────────────────
+  // ACQUIRING jitter simulates a sensor still hunting; once the AI
+  // settles into TRACKING/LOCK the box is rock-steady (matches real
+  // EO/IR tracker footage).
+  const jitterAmp =
+    acquireRamp >= 0.95 ? 0.4 :
+    acquireRamp >= 0.5  ? 1.2 :
+                          2.5
+  const jitterX = Math.sin(t * 1.3) * jitterAmp + Math.sin(t * 4.2) * (jitterAmp * 0.25)
+  const jitterY = Math.cos(t * 0.9) * (jitterAmp * 0.6) + Math.cos(t * 3.7) * (jitterAmp * 0.2)
 
   const boxX = VB_W / 2 + driftX + jitterX
-  const boxY = VB_H / 2 + driftY + jitterY - 8
+  const boxY = VB_H / 2 + driftY + jitterY
 
-  // Apparent angular size grows as 1/range. Clamped.
-  const range = track?.range_m ?? 0
-  const baseBoxSize = showLockOn ? Math.min(110, 4500 / Math.max(50, range)) : 0
-  // Scale the visible box by the acquire ramp so it fades in cleanly.
+  // Apparent angular size grows as 1/range — using true slant range.
+  const baseBoxSize = showLockOn ? Math.min(110, 5000 / Math.max(80, slantRangeM)) : 0
   const boxSize = baseBoxSize * acquireRamp
   const boxOpacity = acquireRamp
 
   // Tracker label · driven by range, matching the acquire ramp's bands.
   const aiState =
     phase === 'launch'
-      ? rangeM > 1500
+      ? slantRangeM > 1500
         ? 'AI · SEARCH'
-        : rangeM > 900
+        : slantRangeM > 900
           ? 'AI · ACQUIRING'
-          : rangeM > 400
+          : slantRangeM > 400
             ? 'AI · TRACKING'
             : 'AI · LOCK'
       : phase === 'capture'
         ? 'AI · LOCK'
         : 'STANDBY'
+
+  // Lock-state visual — color, stroke style, and pulse intensity escalate
+  // from acquiring (white dashed) → tracking (amber solid) → lock
+  // (red bold + flash). Operator reads "is the AI ready to fire" at
+  // a glance from the box itself, not just the text label.
+  const isLockState =
+    phase === 'capture' || (phase === 'launch' && slantRangeM <= 400)
+  const isTrackingState = phase === 'launch' && slantRangeM > 400 && slantRangeM <= 900
+  const isAcquiringState = phase === 'launch' && slantRangeM > 900 && slantRangeM <= 1500
+  const boxColor = isLockState
+    ? '#ff3d55'                      // red · LOCK
+    : isTrackingState
+      ? '#ffb020'                    // amber · TRACKING
+      : isAcquiringState
+        ? '#ffffff'                  // white · ACQUIRING
+        : '#ffffff'                  // fallback
+  const boxStrokeWidth = isLockState ? 1.8 : isTrackingState ? 1.4 : 1.0
+  const boxDash = isAcquiringState ? '4 3' : undefined
+  const boxClass = isLockState
+    ? 'u10-track-box u10-track-box-lock'   // faster/stronger pulse
+    : 'u10-track-box'
 
   // Airframe shake during launch (vibration cue).
   const shakeClass = phase === 'launch' ? 'u10-shake' : ''
@@ -167,47 +207,37 @@ export default function U10FrontCam({ tel }: Props) {
   const netHalf = (NET_PEAK_PX / 2) * eU
   const shotR = SHOT_PEAK_PX * eU
 
+  // ── CV keypoint dots ─────────────────────────────────────────
+  // Sparse green dots scattered across the frame, simulating feature
+  // points from the on-board vision pipeline. Stable across frames
+  // (no per-frame randomness) so the field doesn't shimmer; subtle
+  // micro-motion from the t-driven phase keeps them feeling "live".
+  const KEYPOINTS = [
+    [0.12, 0.28], [0.18, 0.62], [0.07, 0.81], [0.31, 0.74], [0.42, 0.55],
+    [0.58, 0.69], [0.66, 0.42], [0.74, 0.81], [0.83, 0.34], [0.91, 0.65],
+    [0.22, 0.18], [0.49, 0.21], [0.78, 0.18], [0.94, 0.44], [0.05, 0.55],
+  ] as const
+
   return (
     <div className={`u10-cam-wrap ${shakeClass}`}>
+      {/* Live 3D Cesium scene from the U10's POV — sits behind everything */}
+      <MiniSceneView />
+
       <svg className="u10-svg" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
-        {/* sky / ground gradient — pitch-shifted so horizon moves */}
-        <defs>
-          <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"  stopColor="#0c1828" />
-            <stop offset="55%" stopColor="#1a2a44" />
-            <stop offset="55.1%" stopColor="#0d1610" />
-            <stop offset="100%" stopColor="#050a08" />
-          </linearGradient>
-        </defs>
-
-        {/* Horizon + pitch ladder are wrapped in a group that rotates with
-            the airframe roll (banking) and translates with pitch. The
-            reticle and AI box stay screen-fixed (rendered outside this g). */}
-        <g transform={`rotate(${rollDeg} ${VB_W / 2} ${VB_H * 0.55}) translate(0 ${pitchDeg * 4})`}>
-          <rect x={-VB_W} y={-VB_H} width={VB_W * 3} height={VB_H * 3} fill="url(#skyGrad)" />
-          {/* (the u10_action.jpg horizon-blend image was removed — it read as
-              a stray helicopter behind the synthetic horizon and broke the
-              "EO sensor feed" mental model. The cleaner SVG-only horizon plus
-              the engagement-instant overlays below make the moment more
-              legible than the photo blend ever did.) */}
-          {/* horizon line */}
-          <line x1={-VB_W} y1={VB_H * 0.55} x2={VB_W * 2} y2={VB_H * 0.55}
-                stroke="rgba(122,138,158,0.4)" strokeWidth="0.6" />
-
-          {/* pitch ladder · simple 3-line ladder · banks with roll */}
-          {[-10, -5, 5, 10].map((p) => {
-            const y = VB_H * 0.55 + (-p) * 4
+        {/* CV feature points — sparse green dots scattered across frame */}
+        <g fill="rgba(0,232,122,0.6)">
+          {KEYPOINTS.map(([fx, fy], i) => {
+            // Tiny per-dot drift so they don't look painted on
+            const dx = Math.sin(t * 0.7 + i * 1.3) * 0.4
+            const dy = Math.cos(t * 0.5 + i * 0.9) * 0.4
             return (
-              <g key={p} stroke="rgba(122,138,158,0.45)" strokeWidth="0.6">
-                <line x1={VB_W / 2 - 30} y1={y} x2={VB_W / 2 - 12} y2={y} />
-                <line x1={VB_W / 2 + 12} y1={y} x2={VB_W / 2 + 30} y2={y} />
-                <text x={VB_W / 2 - 36} y={y + 2}
-                      fontFamily="var(--mono)" fontSize="5"
-                      fill="rgba(122,138,158,0.6)" textAnchor="end">{p}°</text>
-                <text x={VB_W / 2 + 36} y={y + 2}
-                      fontFamily="var(--mono)" fontSize="5"
-                      fill="rgba(122,138,158,0.6)">{p}°</text>
-              </g>
+              <circle
+                key={i}
+                cx={fx * VB_W + dx}
+                cy={fy * VB_H + dy}
+                r={0.9}
+                opacity={0.5 + 0.3 * Math.sin(t * 1.1 + i)}
+              />
             )
           })}
         </g>
@@ -222,7 +252,8 @@ export default function U10FrontCam({ tel }: Props) {
           <circle cx={VB_W / 2} cy={VB_H / 2} r={1.8} fill="rgba(0,232,122,0.85)" />
         </g>
 
-        {/* AI tracker box on hostile FPV */}
+        {/* AI tracker box on hostile FPV — color/style escalates with
+            the lock state (white dashed → amber solid → red bold flash). */}
         {showLockOn && (
           <g opacity={boxOpacity}>
             {/* outer · pulsing */}
@@ -232,9 +263,10 @@ export default function U10FrontCam({ tel }: Props) {
               width={boxSize}
               height={boxSize}
               fill="none"
-              stroke="#ff3d55"
-              strokeWidth="1.2"
-              className="u10-track-box"
+              stroke={boxColor}
+              strokeWidth={boxStrokeWidth}
+              strokeDasharray={boxDash}
+              className={boxClass}
             />
             {/* corner brackets */}
             {[
@@ -243,7 +275,7 @@ export default function U10FrontCam({ tel }: Props) {
               [boxX - boxSize / 2, boxY + boxSize / 2, 1, -1],
               [boxX + boxSize / 2, boxY + boxSize / 2, -1, -1],
             ].map(([x, y, sx, sy], i) => (
-              <g key={i} stroke="#ff3d55" strokeWidth="2">
+              <g key={i} stroke={boxColor} strokeWidth={isLockState ? 2.5 : 2}>
                 <line x1={x} y1={y} x2={(x as number) + (sx as number) * 8} y2={y} />
                 <line x1={x} y1={y} x2={x} y2={(y as number) + (sy as number) * 8} />
               </g>
@@ -251,12 +283,41 @@ export default function U10FrontCam({ tel }: Props) {
             {/* label above box */}
             <text x={boxX - boxSize / 2} y={boxY - boxSize / 2 - 4}
                   fontFamily="var(--mono)" fontSize="6"
-                  fill="#ff3d55">
-              TGT · {trackId} · {(range / 1000).toFixed(2)}km
+                  fill={boxColor}
+                  fontWeight={isLockState ? 700 : 400}>
+              TGT · {trackId} · {(slantRangeM / 1000).toFixed(2)}km
             </text>
-            {/* small dot inside, simulating the drone's silhouette */}
-            <circle cx={boxX} cy={boxY} r={Math.max(2, boxSize * 0.05)}
-                    fill="#ff3d55" opacity="0.7" />
+            {/* Threat silhouette inside box — simplified quadcopter
+                from above (4 rotor disks on an X frame). Recognizable
+                even at small sizes; scales with box size so the lock
+                always frames the airframe sensibly. */}
+            {(() => {
+              const armR = Math.max(3, boxSize * 0.27)
+              const rotorR = Math.max(1.2, boxSize * 0.10)
+              const bodyR = Math.max(0.8, boxSize * 0.06)
+              const stroke = Math.max(0.5, boxSize * 0.018)
+              return (
+                <g
+                  transform={`translate(${boxX}, ${boxY})`}
+                  stroke={boxColor}
+                  fill="none"
+                  strokeWidth={stroke}
+                  strokeLinecap="round"
+                  opacity={0.95}
+                >
+                  {/* X-frame arms */}
+                  <line x1={-armR} y1={-armR} x2={armR} y2={armR} />
+                  <line x1={-armR} y1={armR} x2={armR} y2={-armR} />
+                  {/* Rotor disks at arm ends */}
+                  <circle cx={-armR} cy={-armR} r={rotorR} />
+                  <circle cx={armR} cy={-armR} r={rotorR} />
+                  <circle cx={-armR} cy={armR} r={rotorR} />
+                  <circle cx={armR} cy={armR} r={rotorR} />
+                  {/* Center body (filled) */}
+                  <circle cx={0} cy={0} r={bodyR} fill={boxColor} stroke="none" />
+                </g>
+              )
+            })()}
           </g>
         )}
 
@@ -347,7 +408,7 @@ export default function U10FrontCam({ tel }: Props) {
       <div className="u10-hud-tr">
         {showLockOn && sol && (
           <>
-            <div>RNG <span className="hud-val red">{(range / 1000).toFixed(2)}</span> km</div>
+            <div>RNG <span className="hud-val red">{(slantRangeM / 1000).toFixed(2)}</span> km</div>
             <div>ETA <span className="hud-val red">T+{sol.eta_to_capture_s}s</span></div>
           </>
         )}

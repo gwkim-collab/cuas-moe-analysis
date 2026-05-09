@@ -189,10 +189,23 @@
   inset: 0;
   overflow: hidden;
 }
+/* Live 3D Cesium scene rendered from the AB-U10's POV. Sits behind the
+   SVG overlays (track box, reticle, HUD). */
+.u10-mini-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.u10-mini-scene > div { /* Resium wraps the viewer in a div */
+  width: 100%;
+  height: 100%;
+}
 .u10-svg {
   width: 100%;
   height: 100%;
   display: block;
+  position: relative;
+  z-index: 1;
 }
 .u10-shake {
   animation: u10-jiggle 0.18s linear infinite;
@@ -210,6 +223,16 @@
 @keyframes u10-box-pulse {
   0%, 100% { stroke-opacity: 0.7; }
   50%      { stroke-opacity: 1.0; }
+}
+/* LOCK state — faster, more aggressive flash to communicate "ready
+   to fire". Stroke goes fully transparent on the off-beat for a
+   harder strobe vs the gentle pulse of the acquiring/tracking states. */
+.u10-track-box-lock {
+  animation: u10-box-lock-flash 0.4s steps(2, end) infinite;
+}
+@keyframes u10-box-lock-flash {
+  0%, 49%   { stroke-opacity: 1.0; }
+  50%, 100% { stroke-opacity: 0.4; }
 }
 
 .u10-hud-tl, .u10-hud-tr, .u10-hud-bl, .u10-hud-br {
@@ -775,7 +798,11 @@
 }
 .card .row:last-child { margin-bottom: 0; }
 .card .lbl { color: var(--text3); }
-.card .val { font-family: var(--mono); color: var(--text2); }
+/* General numeric values are bright white (high readability for ops
+   data). Modifier classes below opt-in to semantic emphasis: green for
+   system-OK / armed / progress, amber for caution / decision-needed,
+   red for danger / hostile / imminent. */
+.card .val { font-family: var(--mono); color: var(--text); }
 .card .val.green { color: var(--green); }
 .card .val.amber { color: var(--amber); }
 .card .val.red { color: var(--red); }

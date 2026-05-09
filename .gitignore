@@ -4,3 +4,8 @@ dist
 *.log
 .env.local
 .env.*.local
+
+.vercel
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo

@@ -9,7 +9,10 @@ const SEV_COLOR: Record<StatusTextMessage['severity'], string> = {
   CRITICAL: 'var(--red)',
   ERROR: 'var(--red)',
   WARNING: 'var(--amber)',
-  NOTICE: 'var(--blue)',
+  // NOTICE = "normal but significant" — progress events like APPROVED /
+  // LAUNCHING / NEUTRALIZED. Green fits the "system OK / step done"
+  // semantic better than blue.
+  NOTICE: 'var(--green)',
   INFO: 'var(--text2)',
   DEBUG: 'var(--text3)',
 }
