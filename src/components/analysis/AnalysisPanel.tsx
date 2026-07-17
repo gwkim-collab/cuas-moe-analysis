@@ -5,6 +5,8 @@ interface Props {
   scenario: Scenario
   onChange: (next: Scenario) => void
   onReset: () => void
+  /** Open the formula/diagram explainer for a parameter key. */
+  onExplain?: (key: string) => void
 }
 
 // Meaning of a parameter (for the hover tooltip), from the doc registry.
@@ -13,28 +15,47 @@ function hintFor(key: string): string | undefined {
   return info ? `${info.description}\n\n[출처] ${info.source}` : undefined
 }
 
-// Small labelled numeric input. `hint` becomes a hover tooltip (title).
+// Small labelled numeric input. Hover shows the meaning; the ⓘ button
+// opens the formula/diagram explainer for `paramKey`.
 function NumField({
   label,
   unit,
   value,
   step,
-  hint,
+  paramKey,
+  onExplain,
   onChange,
 }: {
   label: string
   unit?: string
   value: number
   step?: number
-  hint?: string
+  paramKey: string
+  onExplain?: (key: string) => void
   onChange: (v: number) => void
 }) {
+  const hint = hintFor(paramKey)
   return (
     <label className="an-field" title={hint}>
       <span className="an-field-label">
         {label}
         {unit ? <em className="an-field-unit"> · {unit}</em> : null}
-        {hint ? <span className="an-field-info" aria-hidden>ⓘ</span> : null}
+        {onExplain ? (
+          <button
+            type="button"
+            className="an-field-info"
+            title="수식·그림으로 설명 보기"
+            onClick={(ev) => {
+              ev.preventDefault()
+              ev.stopPropagation()
+              onExplain(paramKey)
+            }}
+          >
+            ⓘ
+          </button>
+        ) : hint ? (
+          <span className="an-field-info" aria-hidden>ⓘ</span>
+        ) : null}
       </span>
       <input
         type="number"
@@ -49,7 +70,7 @@ function NumField({
   )
 }
 
-export default function AnalysisPanel({ scenario, onChange, onReset }: Props) {
+export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }: Props) {
   const setThreat = (p: Partial<Scenario['threat']>) =>
     onChange({ ...scenario, threat: { ...scenario.threat, ...p } })
   const setSensor = (p: Partial<Scenario['sensor']>) =>
@@ -81,31 +102,31 @@ export default function AnalysisPanel({ scenario, onChange, onReset }: Props) {
 
       <fieldset className="an-group">
         <legend>위협 · THREAT</legend>
-        <NumField label="RCS" unit="m²" value={t.rcs_m2} step={0.001} hint={hintFor('threat.rcs_m2')} onChange={(v) => setThreat({ rcs_m2: v })} />
-        <NumField label="속도" unit="m/s" value={t.speed_m_s} hint={hintFor('threat.speed_m_s')} onChange={(v) => setThreat({ speed_m_s: v })} />
-        <NumField label="고도 AGL" unit="m" value={t.altitude_m_agl} hint={hintFor('threat.altitude_m_agl')} onChange={(v) => setThreat({ altitude_m_agl: v })} />
-        <NumField label="진입 거리" unit="m" value={t.ingress_range_m} hint={hintFor('threat.ingress_range_m')} onChange={(v) => setThreat({ ingress_range_m: v })} />
-        <NumField label="진입 방위" unit="°" value={t.approach_bearing_deg} hint={hintFor('threat.approach_bearing_deg')} onChange={(v) => setThreat({ approach_bearing_deg: v })} />
-        <NumField label="표적 크기" unit="m" value={t.characteristic_size_m} step={0.05} hint={hintFor('threat.characteristic_size_m')} onChange={(v) => setThreat({ characteristic_size_m: v })} />
+        <NumField label="RCS" unit="m²" value={t.rcs_m2} step={0.001} paramKey="threat.rcs_m2" onExplain={onExplain} onChange={(v) => setThreat({ rcs_m2: v })} />
+        <NumField label="속도" unit="m/s" value={t.speed_m_s} paramKey="threat.speed_m_s" onExplain={onExplain} onChange={(v) => setThreat({ speed_m_s: v })} />
+        <NumField label="고도 AGL" unit="m" value={t.altitude_m_agl} paramKey="threat.altitude_m_agl" onExplain={onExplain} onChange={(v) => setThreat({ altitude_m_agl: v })} />
+        <NumField label="진입 거리" unit="m" value={t.ingress_range_m} paramKey="threat.ingress_range_m" onExplain={onExplain} onChange={(v) => setThreat({ ingress_range_m: v })} />
+        <NumField label="진입 방위" unit="°" value={t.approach_bearing_deg} paramKey="threat.approach_bearing_deg" onExplain={onExplain} onChange={(v) => setThreat({ approach_bearing_deg: v })} />
+        <NumField label="표적 크기" unit="m" value={t.characteristic_size_m} step={0.05} paramKey="threat.characteristic_size_m" onExplain={onExplain} onChange={(v) => setThreat({ characteristic_size_m: v })} />
       </fieldset>
 
       <fieldset className="an-group">
         <legend>레이더 · SENSOR</legend>
-        <NumField label="기준 RCS" unit="m²" value={s.ref_rcs_m2} step={0.001} hint={hintFor('sensor.ref_rcs_m2')} onChange={(v) => setSensor({ ref_rcs_m2: v })} />
-        <NumField label="기준 탐지거리" unit="m" value={s.ref_detection_range_m} hint={hintFor('sensor.ref_detection_range_m')} onChange={(v) => setSensor({ ref_detection_range_m: v })} />
-        <NumField label="최대 Pd" value={s.pd_max} step={0.01} hint={hintFor('sensor.pd_max')} onChange={(v) => setSensor({ pd_max: v })} />
-        <NumField label="전이 폭" unit="m" value={s.pd_transition_width_m} hint={hintFor('sensor.pd_transition_width_m')} onChange={(v) => setSensor({ pd_transition_width_m: v })} />
-        <NumField label="재방문 주기" unit="s" value={s.revisit_time_s} step={0.1} hint={hintFor('sensor.revisit_time_s')} onChange={(v) => setSensor({ revisit_time_s: v })} />
-        <NumField label="분류 시간" unit="s" value={s.classify_time_s} step={0.5} hint={hintFor('sensor.classify_time_s')} onChange={(v) => setSensor({ classify_time_s: v })} />
-        <NumField label="분류기 상한" value={s.classify_prob} step={0.01} hint={hintFor('sensor.classify_prob')} onChange={(v) => setSensor({ classify_prob: v })} />
+        <NumField label="기준 RCS" unit="m²" value={s.ref_rcs_m2} step={0.001} paramKey="sensor.ref_rcs_m2" onExplain={onExplain} onChange={(v) => setSensor({ ref_rcs_m2: v })} />
+        <NumField label="기준 탐지거리" unit="m" value={s.ref_detection_range_m} paramKey="sensor.ref_detection_range_m" onExplain={onExplain} onChange={(v) => setSensor({ ref_detection_range_m: v })} />
+        <NumField label="최대 Pd" value={s.pd_max} step={0.01} paramKey="sensor.pd_max" onExplain={onExplain} onChange={(v) => setSensor({ pd_max: v })} />
+        <NumField label="전이 폭" unit="m" value={s.pd_transition_width_m} paramKey="sensor.pd_transition_width_m" onExplain={onExplain} onChange={(v) => setSensor({ pd_transition_width_m: v })} />
+        <NumField label="재방문 주기" unit="s" value={s.revisit_time_s} step={0.1} paramKey="sensor.revisit_time_s" onExplain={onExplain} onChange={(v) => setSensor({ revisit_time_s: v })} />
+        <NumField label="분류 시간" unit="s" value={s.classify_time_s} step={0.5} paramKey="sensor.classify_time_s" onExplain={onExplain} onChange={(v) => setSensor({ classify_time_s: v })} />
+        <NumField label="분류기 상한" value={s.classify_prob} step={0.01} paramKey="sensor.classify_prob" onExplain={onExplain} onChange={(v) => setSensor({ classify_prob: v })} />
       </fieldset>
 
       <fieldset className="an-group">
         <legend>EO/IR 광학 · 인식</legend>
-        <NumField label="화각 HFOV" unit="°" value={o.hfov_deg} step={0.1} hint={hintFor('optics.hfov_deg')} onChange={(v) => setOptics({ hfov_deg: v })} />
-        <NumField label="가로 해상도" unit="px" value={o.h_resolution_px} step={10} hint={hintFor('optics.h_resolution_px')} onChange={(v) => setOptics({ h_resolution_px: v })} />
-        <NumField label="센서 폭" unit="mm" value={o.sensor_width_mm} step={0.1} hint={hintFor('optics.sensor_width_mm')} onChange={(v) => setOptics({ sensor_width_mm: v })} />
-        <NumField label="인식 요구픽셀 N50" unit="px" value={o.n50_recognition} step={1} hint={hintFor('optics.n50_recognition')} onChange={(v) => setOptics({ n50_recognition: v })} />
+        <NumField label="화각 HFOV" unit="°" value={o.hfov_deg} step={0.1} paramKey="optics.hfov_deg" onExplain={onExplain} onChange={(v) => setOptics({ hfov_deg: v })} />
+        <NumField label="가로 해상도" unit="px" value={o.h_resolution_px} step={10} paramKey="optics.h_resolution_px" onExplain={onExplain} onChange={(v) => setOptics({ h_resolution_px: v })} />
+        <NumField label="센서 폭" unit="mm" value={o.sensor_width_mm} step={0.1} paramKey="optics.sensor_width_mm" onExplain={onExplain} onChange={(v) => setOptics({ sensor_width_mm: v })} />
+        <NumField label="인식 요구픽셀 N50" unit="px" value={o.n50_recognition} step={1} paramKey="optics.n50_recognition" onExplain={onExplain} onChange={(v) => setOptics({ n50_recognition: v })} />
         <p className="an-field-note ab-small">
           ≈ 초점거리 {focalLengthMm(o).toFixed(0)} mm (센서폭 {o.sensor_width_mm} mm 기준)
         </p>
@@ -126,29 +147,29 @@ export default function AnalysisPanel({ scenario, onChange, onReset }: Props) {
             <option value="shotgun">SHOTGUN</option>
           </select>
         </label>
-        <NumField label="발사 지연" unit="s" value={e.launch_delay_s} step={0.5} hint={hintFor('effector.launch_delay_s')} onChange={(v) => setEffector({ launch_delay_s: v })} />
-        <NumField label="순항 속도" unit="m/s" value={e.cruise_speed_m_s} hint={hintFor('effector.cruise_speed_m_s')} onChange={(v) => setEffector({ cruise_speed_m_s: v })} />
-        <NumField label="최대 교전거리" unit="m" value={e.max_engagement_range_m} hint={hintFor('effector.max_engagement_range_m')} onChange={(v) => setEffector({ max_engagement_range_m: v })} />
-        <NumField label="발사대 거리" unit="m" value={e.launch_pad_range_from_asset_m} hint={hintFor('effector.launch_pad_range_from_asset_m')} onChange={(v) => setEffector({ launch_pad_range_from_asset_m: v })} />
-        <NumField label="단발 Pk · net" value={e.single_shot_pk_net} step={0.01} hint={hintFor('effector.single_shot_pk_net')} onChange={(v) => setEffector({ single_shot_pk_net: v })} />
-        <NumField label="단발 Pk · shotgun" value={e.single_shot_pk_shotgun} step={0.01} hint={hintFor('effector.single_shot_pk_shotgun')} onChange={(v) => setEffector({ single_shot_pk_shotgun: v })} />
-        <NumField label="사격 기회 수" value={e.shot_opportunities} step={1} hint={hintFor('effector.shot_opportunities')} onChange={(v) => setEffector({ shot_opportunities: v })} />
+        <NumField label="발사 지연" unit="s" value={e.launch_delay_s} step={0.5} paramKey="effector.launch_delay_s" onExplain={onExplain} onChange={(v) => setEffector({ launch_delay_s: v })} />
+        <NumField label="순항 속도" unit="m/s" value={e.cruise_speed_m_s} paramKey="effector.cruise_speed_m_s" onExplain={onExplain} onChange={(v) => setEffector({ cruise_speed_m_s: v })} />
+        <NumField label="최대 교전거리" unit="m" value={e.max_engagement_range_m} paramKey="effector.max_engagement_range_m" onExplain={onExplain} onChange={(v) => setEffector({ max_engagement_range_m: v })} />
+        <NumField label="발사대 거리" unit="m" value={e.launch_pad_range_from_asset_m} paramKey="effector.launch_pad_range_from_asset_m" onExplain={onExplain} onChange={(v) => setEffector({ launch_pad_range_from_asset_m: v })} />
+        <NumField label="단발 Pk · net" value={e.single_shot_pk_net} step={0.01} paramKey="effector.single_shot_pk_net" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_net: v })} />
+        <NumField label="단발 Pk · shotgun" value={e.single_shot_pk_shotgun} step={0.01} paramKey="effector.single_shot_pk_shotgun" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_shotgun: v })} />
+        <NumField label="사격 기회 수" value={e.shot_opportunities} step={1} paramKey="effector.shot_opportunities" onExplain={onExplain} onChange={(v) => setEffector({ shot_opportunities: v })} />
       </fieldset>
 
       <fieldset className="an-group">
         <legend>C2 · 결심</legend>
-        <NumField label="결심 지연" unit="s" value={c.decision_latency_s} step={0.5} hint={hintFor('c2.decision_latency_s')} onChange={(v) => setC2({ decision_latency_s: v })} />
-        <NumField label="결심 신뢰도" value={c.decision_reliability} step={0.01} hint={hintFor('c2.decision_reliability')} onChange={(v) => setC2({ decision_reliability: v })} />
+        <NumField label="결심 지연" unit="s" value={c.decision_latency_s} step={0.5} paramKey="c2.decision_latency_s" onExplain={onExplain} onChange={(v) => setC2({ decision_latency_s: v })} />
+        <NumField label="결심 신뢰도" value={c.decision_reliability} step={0.01} paramKey="c2.decision_reliability" onExplain={onExplain} onChange={(v) => setC2({ decision_reliability: v })} />
       </fieldset>
 
       <fieldset className="an-group">
         <legend>사이트 · SITE</legend>
-        <NumField label="Keep-out 반경" unit="m" value={si.keep_out_radius_m} hint={hintFor('site.keep_out_radius_m')} onChange={(v) => setSite({ keep_out_radius_m: v })} />
+        <NumField label="Keep-out 반경" unit="m" value={si.keep_out_radius_m} paramKey="site.keep_out_radius_m" onExplain={onExplain} onChange={(v) => setSite({ keep_out_radius_m: v })} />
       </fieldset>
 
       <p className="an-disclaimer ab-small">
         ⚠ 기본값은 공개 문헌·목업 기준의 <b>편집 가능한 플레이스홀더</b>이며 확정 성능치가
-        아닙니다. 각 항목 의미·출처는 상단 <b>파라미터 설명</b> 탭 또는 필드에 마우스를 올리면 볼 수 있습니다.
+        아닙니다. 각 항목 <b>ⓘ</b>를 누르면 수식·그림 설명이, 마우스를 올리면 요약이 나옵니다.
       </p>
     </div>
   )

@@ -17,6 +17,7 @@ import CoverageView from './CoverageView'
 import TradeView from './TradeView'
 import SpecView from './SpecView'
 import ReferenceView from './ReferenceView'
+import ParamExplainModal from './ParamExplainModal'
 import { downloadText, fileStamp } from './download'
 import './analysis.css'
 
@@ -53,6 +54,7 @@ export default function AnalysisView({ onExit }: Props) {
   const [trials, setTrials] = useState(3000)
   const [seed, setSeed] = useState(2026)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [explainKey, setExplainKey] = useState<string | null>(null)
 
   const engagementResult = useMemo(() => computeMoe(scenario), [scenario])
   const mcResult = useMemo(
@@ -154,6 +156,7 @@ export default function AnalysisView({ onExit }: Props) {
           scenario={scenario}
           onChange={setScenario}
           onReset={() => setScenario(defaultScenario())}
+          onExplain={setExplainKey}
         />
 
         <div className="an-content">
@@ -210,9 +213,11 @@ export default function AnalysisView({ onExit }: Props) {
           {type === 'coverage' && <CoverageView scenario={scenario} />}
           {type === 'trade' && <TradeView scenario={scenario} />}
           {type === 'spec' && <SpecView scenario={scenario} />}
-          {type === 'reference' && <ReferenceView scenario={scenario} />}
+          {type === 'reference' && <ReferenceView scenario={scenario} onExplain={setExplainKey} />}
         </div>
       </div>
+
+      <ParamExplainModal paramKey={explainKey} scenario={scenario} onClose={() => setExplainKey(null)} />
     </div>
   )
 }

@@ -2,6 +2,8 @@ import { PARAM_INFO, type Scenario } from '../../analysis'
 
 interface Props {
   scenario: Scenario
+  /** Open the formula/diagram explainer for a parameter key. */
+  onExplain?: (key: string) => void
 }
 
 // Section display order.
@@ -18,7 +20,7 @@ function fmtVal(v: number): string {
  * formula basis comes from. Data-driven from PARAM_INFO (the same registry
  * that powers tooltips and CSV export).
  */
-export default function ReferenceView({ scenario }: Props) {
+export default function ReferenceView({ scenario, onExplain }: Props) {
   return (
     <div className="an-results">
       <div className="an-card">
@@ -36,6 +38,7 @@ export default function ReferenceView({ scenario }: Props) {
                 <th>단위</th>
                 <th>의미</th>
                 <th>출처 / 근거</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -44,7 +47,7 @@ export default function ReferenceView({ scenario }: Props) {
                 if (rows.length === 0) return []
                 return [
                   <tr key={`h-${section}`} className="an-ref-section">
-                    <td colSpan={5}>{section}</td>
+                    <td colSpan={6}>{section}</td>
                   </tr>,
                   ...rows.map((p) => (
                     <tr key={p.key}>
@@ -56,6 +59,13 @@ export default function ReferenceView({ scenario }: Props) {
                       <td className="an-ref-unit">{p.unit ?? ''}</td>
                       <td className="an-ref-desc">{p.description}</td>
                       <td className="an-ref-src">{p.source}</td>
+                      <td className="an-ref-explain">
+                        {onExplain ? (
+                          <button type="button" className="an-btn-ghost an-btn-mini" onClick={() => onExplain(p.key)}>
+                            수식·그림
+                          </button>
+                        ) : null}
+                      </td>
                     </tr>
                   )),
                 ]
