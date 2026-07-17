@@ -101,6 +101,19 @@ export function scenarioToCsv(scenario: Scenario): string {
   return lines.join('\r\n')
 }
 
+// UTF-8 BOM. Excel needs it to read the Korean columns without mojibake;
+// the importer (parseCsv) strips a leading BOM, so files stay round-trippable.
+export const CSV_BOM = '﻿'
+
+/**
+ * CSV for file download / Excel: `scenarioToCsv` prefixed with a UTF-8 BOM.
+ * Use this at every file boundary (in-app download, generated sample) so all
+ * emitted files are byte-identical and open cleanly in Excel.
+ */
+export function scenarioToCsvFile(scenario: Scenario): string {
+  return CSV_BOM + scenarioToCsv(scenario)
+}
+
 // ── Import ────────────────────────────────────────────────────
 export interface CsvImportResult {
   scenario: Scenario

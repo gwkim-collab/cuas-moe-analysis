@@ -6,7 +6,7 @@ import {
   buildReport,
   reportToJson,
   reportToMarkdown,
-  scenarioToCsv,
+  scenarioToCsvFile,
   applyCsv,
   type Scenario,
 } from '../../analysis'
@@ -74,9 +74,14 @@ export default function AnalysisView({ onExit }: Props) {
   }
 
   const exportCsv = () => {
-    // UTF-8 BOM so Excel reads the Korean columns correctly.
-    downloadText(`airlock-params-${fileStamp(new Date())}.csv`, '﻿' + scenarioToCsv(scenario), 'text/csv')
+    // scenarioToCsvFile carries a UTF-8 BOM so Excel reads the Korean columns.
+    downloadText(`airlock-params-${fileStamp(new Date())}.csv`, scenarioToCsvFile(scenario), 'text/csv')
   }
+
+  // Static default-scenario sample (public/samples), generated from the param
+  // registry via `pnpm gen:sample`. Lets a user grab the exact CSV format —
+  // and see every parameter's 의미/출처 — without launching a run first.
+  const sampleCsvHref = `${import.meta.env.BASE_URL}samples/scenario-default.csv`
 
   const onImportFile = async (ev: React.ChangeEvent<HTMLInputElement>) => {
     const file = ev.target.files?.[0]
@@ -119,6 +124,9 @@ export default function AnalysisView({ onExit }: Props) {
             <button type="button" className="an-btn-ghost" onClick={exportCsv}>
               ↓ CSV 저장
             </button>
+            <a className="an-btn-ghost" href={sampleCsvHref} download="airlock-params-sample.csv" title="기본 시나리오 샘플 CSV (변수별 의미·출처 포함)">
+              ⤓ 샘플
+            </a>
           </span>
           <span className="an-tb-group">
             <button type="button" className="an-btn-ghost" onClick={() => exportReport('json')}>
