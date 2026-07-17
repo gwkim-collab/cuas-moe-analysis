@@ -52,6 +52,7 @@ import StandbyHint from './components/StandbyHint'
 import HotkeyHint from './components/HotkeyHint'
 import CesiumScaleBar from './components/CesiumScaleBar'
 import RadarScanPulse from './components/RadarScanPulse'
+import AnalysisView from './components/analysis/AnalysisView'
 
 import './App.css'
 
@@ -131,9 +132,13 @@ function SceneInit({ onReady }: { onReady: () => void }) {
     viewer.scene.globe.depthTestAgainstTerrain = true
     viewer.cesiumWidget.creditContainer.setAttribute('style', 'display:none')
 
-    // ── Performance · cap render resolution ─────────────────
-    viewer.useBrowserRecommendedResolution = false
-    viewer.resolutionScale = 0.5
+    // ── Render resolution ───────────────────────────────────
+    // Render at the browser's native device-pixel ratio so map labels
+    // (VIP / AB-U10 / HOSTILE …) stay crisp. This was capped at 0.5 for
+    // performance, which made on-globe text render blurry. If FPS
+    // suffers on a weak GPU, set resolutionScale back toward 0.5–0.75.
+    viewer.useBrowserRecommendedResolution = true
+    viewer.resolutionScale = 1
 
     // ── Performance · disable expensive scene features ──────
     viewer.scene.globe.enableLighting = false
@@ -237,6 +242,12 @@ function CameraController({ flyKey }: { flyKey: number }) {
 
 export default function App() {
   // ── state ──────────────────────────────────────────────────
+  // Top-level mode: the existing cinematic C-UAS scene ('operation')
+  // vs the new effectiveness/MOE analysis tool ('analysis'). Kept as a
+  // simple flag rather than a router so the operational scene is 100%
+  // untouched — analysis is an isolated overlay (see conditional render
+  // just before the operational JSX below).
+  const [mode, setMode] = useState<'operation' | 'analysis'>('operation')
   const [tel, setTel] = useState<CUASTelemetry>(() => initialState('net_gun'))
   const [running, setRunning] = useState(false)
   const [flashPhase, setFlashPhase] = useState<KillChainPhase | null>(null)
@@ -364,6 +375,8 @@ export default function App() {
         case 'KeyG': onRecord(); break
         case 'KeyF': onFlyTo(); break
         case 'KeyD': onCycleSpeed(); break
+        case 'KeyA': setMode('analysis'); break
+        case 'KeyO': setMode('operation'); break
       }
     }
     window.addEventListener('keydown', handler)
@@ -771,10 +784,27 @@ export default function App() {
   // Display values for HUD labels — derived at React tick rate (fine)
   const u10AltDisplay = u10Position3D(tel)[2]
 
+  // ── Analysis mode · isolated overlay ───────────────────────
+  // Rendered AFTER all hooks above so hook order stays stable. The
+  // operational scene below is left exactly as-is.
+  if (mode === 'analysis') {
+    return <AnalysisView onExit={() => setMode('operation')} />
+  }
+
   return (
     <TelRefContext.Provider value={telRef}>
     <div className="app-canvas">
       <TopBar tel={tel} running={running} />
+
+      {/* Enter effectiveness/MOE analysis tool (A) */}
+      <button
+        type="button"
+        className="an-mode-toggle"
+        onClick={() => setMode('analysis')}
+        title="효과도 분석 도구 (A)"
+      >
+        효과도 분석 ▸
+      </button>
 
       <main className="main-grid">
         <CameraStack tel={tel} />
