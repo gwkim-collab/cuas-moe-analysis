@@ -155,13 +155,13 @@ export const PARAM_INFO: ParamInfo[] = [
   {
     key: 'optics.cue_error_deg', section: 'EO/IR', label: '레이더 큐 오차', unit: '°',
     description: '레이더가 카메라에 넘기는 방위 큐의 각도 오차(1σ). 짐벌 없는 고정 카메라라, 표적이 FOV 안에 드는 획득확률 P_acq의 한 성분.',
-    source: `지향 오차(입력) · ${PLACEHOLDER}`,
+    source: `추천 기본값 0.3°(sub-degree 설계목표) · 실측/스펙 입력 필요(SME)`,
     get: (s) => s.optics.cue_error_deg, set: S('optics', 'cue_error_deg'), sweep: { min: 0, max: 10 },
   },
   {
     key: 'optics.pointing_error_deg', section: 'EO/IR', label: '요격기 지향 오차', unit: '°',
     description: '전방 고정 카메라를 비행으로 조준할 때의 LOS 지향 오차(1σ). 큐 오차와 제곱합 √(cue²+point²)으로 P_acq = 1−exp(−(HFOV/2)²/(2σ²))를 결정.',
-    source: `유도/지향 오차(입력) · ${PLACEHOLDER}`,
+    source: `추천 기본값 0.4°(sub-degree 설계목표) · 실측/스펙 입력 필요(SME)`,
     get: (s) => s.optics.pointing_error_deg, set: S('optics', 'pointing_error_deg'), sweep: { min: 0, max: 10 },
   },
 
