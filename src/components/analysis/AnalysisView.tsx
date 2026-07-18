@@ -17,6 +17,7 @@ import CoverageView from './CoverageView'
 import TradeView from './TradeView'
 import SpecView from './SpecView'
 import ReferenceView from './ReferenceView'
+import CompareView from './CompareView'
 import ParamExplainModal from './ParamExplainModal'
 import { downloadText, fileStamp } from './download'
 import './analysis.css'
@@ -25,7 +26,7 @@ interface Props {
   onExit: () => void
 }
 
-type AnalysisType = 'engagement' | 'coverage' | 'trade' | 'spec' | 'reference'
+type AnalysisType = 'engagement' | 'coverage' | 'trade' | 'spec' | 'compare' | 'reference'
 type Fidelity = 'analytical' | 'montecarlo'
 
 const TYPE_LABELS: Record<AnalysisType, string> = {
@@ -33,6 +34,7 @@ const TYPE_LABELS: Record<AnalysisType, string> = {
   coverage: '방어 커버리지',
   trade: '트레이드 스터디',
   spec: '스펙 역산',
+  compare: '시나리오 비교',
   reference: '파라미터 설명',
 }
 
@@ -213,6 +215,7 @@ export default function AnalysisView({ onExit }: Props) {
           {type === 'coverage' && <CoverageView scenario={scenario} />}
           {type === 'trade' && <TradeView scenario={scenario} />}
           {type === 'spec' && <SpecView scenario={scenario} />}
+          {type === 'compare' && <CompareView scenario={scenario} />}
           {type === 'reference' && <ReferenceView scenario={scenario} onExplain={setExplainKey} />}
         </div>
       </div>

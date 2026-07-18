@@ -519,6 +519,20 @@ button.an-field-info:hover { opacity: 1; }
 .an-btn-mini:disabled { opacity: 0.4; cursor: default; }
 .an-ref-explain { text-align: right; }
 
+/* ── A/B compare view ──────────────────────────────────────── */
+.an-cmp-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-2); }
+.an-cmp-select { flex: 0 1 240px; }
+.an-cmp-table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); margin-top: var(--s-2); }
+.an-cmp-table th, .an-cmp-table td { text-align: right; padding: 5px 10px; border-bottom: 1px solid var(--border); }
+.an-cmp-table th:first-child, .an-cmp-table td:first-child { text-align: left; color: var(--text2); }
+.an-cmp-table th { color: var(--text3); font-weight: 600; letter-spacing: var(--ls-label); }
+.an-cmp-table td { font-family: var(--font-mono); color: var(--text); }
+.an-cmp-key td { background: var(--bg-sunken); font-weight: 700; }
+.an-cmp-key td:first-child { color: var(--accent); }
+.an-cmp-delta.up { color: var(--accent); }
+.an-cmp-delta.down { color: var(--red); }
+.an-cmp-feas { margin-top: var(--s-3); color: var(--text2); }
+
 /* ── scenario preset / save-load bar ───────────────────────── */
 .an-scn-bar { display: flex; gap: var(--s-2); align-items: center; margin: 0 0 var(--s-3); }
 .an-scn-select {
