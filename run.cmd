@@ -1,6 +1,37 @@
 @echo off
-REM ── AIRLOCK C2 원클릭 실행 ──────────────────────────────────
-REM 이 파일을 더블클릭하면 dev 서버가 뜨고 브라우저가 자동으로 열립니다.
-REM (터미널에서 실행할 때는  pnpm start  와 동일)
+REM ============================================================
+REM  AIRLOCK C2 - one-click launcher
+REM  Double-click this file to:
+REM    1) install dependencies if missing, then
+REM    2) start the dev server and open the browser automatically.
+REM  (Terminal equivalent:  pnpm start )
+REM  NOTE: ASCII-only on purpose - a .cmd with non-ASCII text is
+REM        mis-decoded by cmd.exe (cp949) and breaks. Do not add
+REM        Korean here.
+REM ============================================================
 cd /d "%~dp0"
+
+where pnpm >nul 2>nul
+if errorlevel 1 goto use_npm
+
+if not exist "node_modules" (
+  echo [*] Installing dependencies with pnpm ...
+  call pnpm install
+)
+echo [*] Starting dev server + opening browser ...
 call pnpm start
+goto done
+
+:use_npm
+echo [!] pnpm not found - using npm instead.
+if not exist "node_modules" (
+  echo [*] Installing dependencies with npm ...
+  call npm install
+)
+echo [*] Starting dev server + opening browser ...
+call npm run start
+
+:done
+echo.
+echo [Server stopped. You can close this window.]
+pause
