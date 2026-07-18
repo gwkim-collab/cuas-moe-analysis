@@ -499,11 +499,22 @@ button.an-field-info:hover { opacity: 1; }
 .an-modal-diagram { background: var(--bg-sunken); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-2); }
 .an-diagram { width: 100%; height: auto; display: block; }
 .an-modal-diagram-note { color: var(--text3); margin-top: var(--s-1); }
-.an-modal-src {
+.an-modal-basis {
   font-size: var(--fs-micro); color: var(--text3);
   border-top: 1px solid var(--border); padding-top: var(--s-2); line-height: var(--lh-normal);
+  display: flex; flex-direction: column; gap: 4px;
 }
 .an-modal-src-label { display: block; color: var(--text2); margin-bottom: 2px; letter-spacing: var(--ls-label); }
+.an-basis-row { display: flex; gap: var(--s-2); align-items: baseline; }
+.an-basis-tag {
+  flex: none; min-width: 30px; text-align: center;
+  font-size: 10px; padding: 1px 5px; border-radius: var(--r-1);
+  border: 1px solid var(--border2); color: var(--text2);
+}
+.an-basis-tag.t-theory { color: var(--accent); border-color: var(--accent); }
+.an-basis-tag.t-assume { color: var(--amber); border-color: var(--amber); }
+.an-basis-tag.t-value { color: var(--text2); }
+.an-basis-need { color: var(--amber); }
 .an-btn-mini { padding: 2px 6px; font-size: var(--fs-micro); white-space: nowrap; }
 .an-ref-explain { text-align: right; }
 

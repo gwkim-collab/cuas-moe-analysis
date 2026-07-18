@@ -67,9 +67,18 @@ export default function ParamExplainModal({ paramKey, scenario, onClose }: Props
             </div>
           ) : null}
 
-          <div className="an-modal-src">
-            <span className="an-modal-src-label">출처 / 근거</span>
-            {info.source}
+          <div className="an-modal-basis">
+            <div className="an-modal-src-label">근거</div>
+            {ex?.theory ? (
+              <div className="an-basis-row"><span className="an-basis-tag t-theory">이론</span><span>{ex.theory}</span></div>
+            ) : null}
+            {ex?.assumption ? (
+              <div className="an-basis-row"><span className="an-basis-tag t-assume">가정</span><span>{ex.assumption}</span></div>
+            ) : null}
+            <div className="an-basis-row">
+              <span className="an-basis-tag t-value">값</span>
+              <span className={/입력 필요/.test(info.source) ? 'an-basis-need' : undefined}>{info.source}</span>
+            </div>
           </div>
         </div>
       </div>

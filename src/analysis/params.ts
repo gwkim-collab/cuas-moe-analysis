@@ -39,20 +39,23 @@ const S =
     [section]: { ...s[section], [field]: v },
   })
 
-const PLACEHOLDER = '플레이스홀더(공개문헌·목업 근사) · SME 검증 필요'
+// Value provenance marker: this number is NOT measured/verified. The MODEL
+// basis (theory·assumption) lives in paramExplain.ts; this field is only the
+// value's source. Unmeasured values say "입력 필요" — never a guess dressed up.
+const PLACEHOLDER = '값 입력 필요 · 측정/스펙 미검증(SME)'
 
 export const PARAM_INFO: ParamInfo[] = [
   // ── 위협 ────────────────────────────────────────────────
   {
     key: 'threat.rcs_m2', section: '위협', label: 'RCS', unit: 'm²',
     description: '레이더 반사 단면적. 레이더 탐지거리를 R∝RCS^¼로 스케일하는 입력.',
-    source: `레이더 방정식(공개 이론). 값: 소형 FPV≈0.01m²(−20dBsm) 근사 · ${PLACEHOLDER}`,
+    source: `참고: 소형 FPV≈0.01㎡(−20dBsm, 공개문헌) · ${PLACEHOLDER}`,
     get: (s) => s.threat.rcs_m2, set: S('threat', 'rcs_m2'), sweep: { min: 0.001, max: 1 },
   },
   {
     key: 'threat.speed_m_s', section: '위협', label: '속도', unit: 'm/s',
     description: '위협 접근 속도. 소요시간 예산과 교전 기하(closing)에 직접 사용.',
-    source: `목업 FPV 32.8m/s(≈118km/h) 기준 · ${PLACEHOLDER}`,
+    source: `참고: FPV≈118km/h(목업) · ${PLACEHOLDER}`,
     get: (s) => s.threat.speed_m_s, set: S('threat', 'speed_m_s'), sweep: { min: 10, max: 120 },
   },
   {
@@ -76,7 +79,7 @@ export const PARAM_INFO: ParamInfo[] = [
   {
     key: 'threat.characteristic_size_m', section: '위협', label: '표적 크기', unit: 'm',
     description: '인식 가능한 임계 치수(로터/윙 스팬 등). EO/IR 표적 픽셀 수 계산의 분자.',
-    source: `소형 FPV≈0.35m 근사 · ${PLACEHOLDER}`,
+    source: `참고: 소형 FPV≈0.35m · ${PLACEHOLDER}`,
     get: (s) => s.threat.characteristic_size_m, set: S('threat', 'characteristic_size_m'), sweep: { min: 0.05, max: 3 },
   },
 
@@ -84,7 +87,7 @@ export const PARAM_INFO: ParamInfo[] = [
   {
     key: 'sensor.ref_rcs_m2', section: '레이더', label: '기준 RCS', unit: 'm²',
     description: '기준 탐지거리가 정의되는 기준 표적 RCS. R∝(RCS/기준RCS)^¼ 스케일 기준점.',
-    source: `레이더 방정식(공개 이론). 값: ${PLACEHOLDER}`,
+    source: `${PLACEHOLDER}`,
     get: (s) => s.sensor.ref_rcs_m2, set: S('sensor', 'ref_rcs_m2'),
   },
   {
@@ -102,7 +105,7 @@ export const PARAM_INFO: ParamInfo[] = [
   {
     key: 'sensor.pd_transition_width_m', section: '레이더', label: 'Pd 전이 폭', unit: 'm',
     description: '탐지거리 경계에서 Pd가 떨어지는 로지스틱 폭(클수록 완만한 경계).',
-    source: `로지스틱 근사(모델 파라미터) · ${PLACEHOLDER}`,
+    source: `${PLACEHOLDER}`,
     get: (s) => s.sensor.pd_transition_width_m, set: S('sensor', 'pd_transition_width_m'),
   },
   {
@@ -146,7 +149,7 @@ export const PARAM_INFO: ParamInfo[] = [
   {
     key: 'optics.n50_recognition', section: 'EO/IR', label: '인식 요구픽셀 N50', unit: 'px',
     description: '50% 인식에 필요한 표적 픽셀 수(난이도 문턱). Johnson 확률 P=f(N/N50). ↑값=난이도↑=성능↓.',
-    source: `Johnson/NVESD 표적획득 기준(공개 이론). N50 값: ${PLACEHOLDER}`,
+    source: `참고: NVESD 표적획득 N50 통상범위 · ${PLACEHOLDER}`,
     get: (s) => s.optics.n50_recognition, set: S('optics', 'n50_recognition'), sweep: { min: 2, max: 20 },
   },
   {
@@ -172,7 +175,7 @@ export const PARAM_INFO: ParamInfo[] = [
   {
     key: 'effector.cruise_speed_m_s', section: '이팩터', label: '요격 속도', unit: 'm/s',
     description: '요격기 외향 순항 속도. 위협과의 closing 속도(v_i+v_t)에 사용.',
-    source: `목업 AB-U10≈50m/s 기준 · ${PLACEHOLDER}`,
+    source: `참고: AB-U10≈50m/s(목업) · ${PLACEHOLDER}`,
     get: (s) => s.effector.cruise_speed_m_s, set: S('effector', 'cruise_speed_m_s'), sweep: { min: 15, max: 150 },
   },
   {
