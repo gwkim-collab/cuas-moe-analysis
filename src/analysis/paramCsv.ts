@@ -11,9 +11,19 @@
 
 import type { Scenario } from './model'
 import { PARAM_INFO, paramInfo } from './params'
+import { paramExplain } from './paramExplain'
 
-const HEADER = ['구분', '파라미터', 'key', '값', '단위', '의미', '출처']
+// Column order: identity/value first (key=idx2, 값=idx3 — the importer reads
+// only those), then the full basis so the exported file documents the model
+// exactly like the in-app explainer. New columns are appended at the END so
+// import stays position-stable.
+const HEADER = ['구분', '파라미터', 'key', '값', '단위', '의미', '값 출처', '수식', '이론 근거', '모델 가정']
 const PAYLOAD_KEY = 'effector.payload'
+
+// Flatten multi-line formula/theory to a single cell (Excel-friendly).
+function flat(s?: string): string {
+  return (s ?? '').replace(/\s*\n\s*/g, ' / ')
+}
 
 // ── minimal RFC4180 CSV ───────────────────────────────────────
 function csvEscape(field: string): string {
@@ -82,8 +92,12 @@ export function parseCsv(text: string): string[][] {
 export function scenarioToCsv(scenario: Scenario): string {
   const lines: string[] = [toRow(HEADER)]
   for (const p of PARAM_INFO) {
+    const ex = paramExplain(p.key)
     lines.push(
-      toRow([p.section, p.label, p.key, p.get(scenario), p.unit ?? '', p.description, p.source]),
+      toRow([
+        p.section, p.label, p.key, p.get(scenario), p.unit ?? '', p.description, p.source,
+        flat(ex?.formula), flat(ex?.theory), flat(ex?.assumption),
+      ]),
     )
   }
   // payload (enum) as a text row so it round-trips.
@@ -96,6 +110,7 @@ export function scenarioToCsv(scenario: Scenario): string {
       '',
       "요격 페이로드 모드('net_gun' 또는 'shotgun'). 사용되는 단발 Pk를 선택.",
       '운용 설정값',
+      '', '', '',
     ]),
   )
   return lines.join('\r\n')
@@ -106,12 +121,14 @@ export function scenarioToCsv(scenario: Scenario): string {
 export const CSV_BOM = '﻿'
 
 /**
- * CSV for file download / Excel: `scenarioToCsv` prefixed with a UTF-8 BOM.
- * Use this at every file boundary (in-app download, generated sample) so all
- * emitted files are byte-identical and open cleanly in Excel.
+ * CSV for file download / Excel: `scenarioToCsv` with a UTF-8 BOM and a
+ * leading `sep=,` hint. The hint forces Excel to split on commas regardless
+ * of the OS list-separator locale (which otherwise shifts columns). parseCsv
+ * yields a 2-field `["sep=",""]` record for that line, which applyCsv skips
+ * (needs ≥4 fields), so files stay round-trippable.
  */
 export function scenarioToCsvFile(scenario: Scenario): string {
-  return CSV_BOM + scenarioToCsv(scenario)
+  return CSV_BOM + 'sep=,\r\n' + scenarioToCsv(scenario)
 }
 
 // ── Import ────────────────────────────────────────────────────
