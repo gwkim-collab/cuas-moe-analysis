@@ -1,5 +1,6 @@
 import { focalLengthMm, paramInfo, type Scenario } from '../../analysis'
 import type { PayloadMode } from '../../types'
+import ScenarioBar from './ScenarioBar'
 
 interface Props {
   scenario: Scenario
@@ -99,6 +100,9 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
           ↺ 기본값
         </button>
       </div>
+
+      <ScenarioBar scenario={scenario} onLoad={onChange} />
+
 
       <fieldset className="an-group">
         <legend>위협 · THREAT</legend>

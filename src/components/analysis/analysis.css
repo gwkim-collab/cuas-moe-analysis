@@ -516,7 +516,17 @@ button.an-field-info:hover { opacity: 1; }
 .an-basis-tag.t-value { color: var(--text2); }
 .an-basis-need { color: var(--amber); }
 .an-btn-mini { padding: 2px 6px; font-size: var(--fs-micro); white-space: nowrap; }
+.an-btn-mini:disabled { opacity: 0.4; cursor: default; }
 .an-ref-explain { text-align: right; }
+
+/* ── scenario preset / save-load bar ───────────────────────── */
+.an-scn-bar { display: flex; gap: var(--s-2); align-items: center; margin: 0 0 var(--s-3); }
+.an-scn-select {
+  flex: 1 1 auto; min-width: 0;
+  font-family: var(--font-mono); font-size: var(--fs-micro);
+  color: var(--text); background: var(--bg-sunken);
+  border: 1px solid var(--border); border-radius: var(--r-2); padding: 3px 6px;
+}
 
 /* ── Parameter reference table ───────────────────────────── */
 .an-ref-scroll { overflow-x: auto; margin-top: var(--s-2); }
