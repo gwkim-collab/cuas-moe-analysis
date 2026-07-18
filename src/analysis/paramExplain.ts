@@ -17,6 +17,7 @@ export type DiagramId =
   | 'johnson-n50'
   | 'pk-cumulative'
   | 'closing-geometry'
+  | 'fov-acquisition'
 
 export interface ParamExplain {
   /** One or more formula lines (unicode math; rendered in a mono block). */
@@ -109,10 +110,11 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
 
   // ── EO/IR ───────────────────────────────────────────────
   'optics.hfov_deg': {
-    formula: 'IFOV = HFOV_rad / H_px\nN_px = size / (range · IFOV)',
+    formula:
+      'N_px = size / (range · HFOV_rad / H_px)      (인식↑ as HFOV↓)\nP_acq = 1 − exp(−(HFOV/2)² / (2σ²))          (획득↓ as HFOV↓)\nP_classify ∝ P_acq · 인식 → 최적 화각 존재',
     detail:
-      '수평 화각이 좁을수록 한 픽셀이 담는 각도(IFOV)가 작아져 같은 거리에서 표적 픽셀 수가 늘어나 인식거리가 길어집니다. 단, 탐색 범위는 좁아집니다(줌↔시야 트레이드오프).',
-    diagram: 'johnson-n50',
+      '두 힘이 반대로 작동합니다. 화각이 좁으면 표적 픽셀 수가 늘어 인식은 쉬워지지만(위로), 짐벌이 없는 고정 카메라라 표적이 그 좁은 시야 밖으로 벗어나기 쉬워 획득확률 P_acq가 떨어집니다(아래). 둘의 곱이 P_classify라서 무작정 좁힐수록 좋은 게 아니라 최적 화각이 생깁니다. 아래 그래프에서 노란선(P_acq)·파란선(인식)·굵은선(곱)과 "현재/최적" 화각을 비교하세요.',
+    diagram: 'fov-acquisition',
   },
   'optics.h_resolution_px': {
     formula: 'IFOV = HFOV_rad / H_px\nN_px = size / (range · IFOV)',
@@ -130,6 +132,18 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
     detail:
       'Johnson/NVESD 표적획득 기준의 난이도 문턱. "50% 인식에 필요한 픽셀 수"라서, N50이 클수록(어려운 과제) 같은 거리에서 인식확률이 낮아집니다. 곡선은 픽셀이 N50에 도달하는 지점에서 급격히 상승합니다.',
     diagram: 'johnson-n50',
+  },
+  'optics.cue_error_deg': {
+    formula: 'σ = √(cue² + point²)\nP_acq = 1 − exp(−(HFOV/2)² / (2σ²))',
+    detail:
+      '짐벌이 없어 표적을 고정 FOV에 넣는 정확도가 관건입니다. 레이더 큐 방위 오차(1σ)가 요격기 지향 오차와 제곱합으로 합쳐져 획득확률 P_acq를 결정합니다. 큐 오차가 크면 같은 화각에서 P_acq가 낮아져 P_classify가 떨어집니다. 아래 그래프는 화각↔P_acq·인식 트레이드오프를 보여줍니다.',
+    diagram: 'fov-acquisition',
+  },
+  'optics.pointing_error_deg': {
+    formula: 'σ = √(cue² + point²)\nP_acq = 1 − exp(−(HFOV/2)² / (2σ²))',
+    detail:
+      '전방 고정 카메라를 비행(유도)으로 조준할 때의 LOS 지향 오차(1σ). 짐벌이 없으므로 이 오차가 커질수록 좁은 화각에서 표적을 프레임에 유지하기 어려워 P_acq가 급감합니다. 큐 오차와 함께 최적 화각을 오른쪽(더 넓게)으로 밀어냅니다.',
+    diagram: 'fov-acquisition',
   },
 
   // ── 이팩터 ──────────────────────────────────────────────

@@ -13,6 +13,7 @@ import {
   pdAtRange,
   recognitionProb,
   recognitionRangeForProb,
+  acquisitionProb,
   singleShotPk,
   computeDetection,
   reachSolution,
@@ -327,6 +328,56 @@ const ClosingGeometry: FC<DiagramProps> = ({ scenario }) => {
   )
 }
 
+// ── 7) FOV trade-off: acquisition × recognition vs HFOV ───────
+const REC = '#7db8ff'
+const ACQ = '#ffcf6b'
+const FovAcquisition: FC<DiagramProps> = ({ scenario }) => {
+  const o = scenario.optics
+  const size = scenario.threat.characteristic_size_m
+  const det = computeDetection(scenario.sensor, scenario.threat, scenario.site.keep_out_radius_m)
+  const classifyRange = Math.max(1, det.detect_at_range_m - scenario.threat.speed_m_s * scenario.sensor.classify_time_s)
+  const lo = 0.3
+  const hi = 40
+  const lx = (v: number) => Math.log10(v)
+  const sx = scale(lx(lo), lx(hi), L, L + PW)
+  const sy = scale(0, 1, T + PH, T)
+  const acqPts: Array<[number, number]> = []
+  const recPts: Array<[number, number]> = []
+  const prodPts: Array<[number, number]> = []
+  let best = { h: o.hfov_deg, p: -1 }
+  for (let i = 0; i <= 100; i++) {
+    const h = Math.pow(10, lx(lo) + ((lx(hi) - lx(lo)) * i) / 100)
+    const oo = { ...o, hfov_deg: h }
+    const acq = acquisitionProb(oo)
+    const rec = recognitionProb(oo, size, classifyRange)
+    const prod = acq * rec
+    acqPts.push([lx(h), acq])
+    recPts.push([lx(h), rec])
+    prodPts.push([lx(h), prod])
+    if (prod > best.p) best = { h, p: prod }
+  }
+  const curX = sx(lx(o.hfov_deg))
+  const optX = sx(lx(best.h))
+  return (
+    <Frame xLabel="화각 HFOV (°, 로그)" yLabel="확률">
+      <ProbGrid sy={sy} />
+      <path d={polyline(acqPts, (x) => sx(x), (y) => sy(y))} fill="none" stroke={ACQ} strokeWidth={1.5} strokeDasharray="4 3" />
+      <path d={polyline(recPts, (x) => sx(x), (y) => sy(y))} fill="none" stroke={REC} strokeWidth={1.5} strokeDasharray="4 3" />
+      <path d={polyline(prodPts, (x) => sx(x), (y) => sy(y))} fill="none" stroke={CURVE} strokeWidth={2.5} />
+      {/* optimum */}
+      <line x1={optX} y1={T} x2={optX} y2={T + PH} stroke={CURVE} strokeDasharray="2 3" opacity={0.7} />
+      <text x={optX} y={T + PH + 14} fill={CURVE} fontSize={10} textAnchor="middle">최적 {fmt(best.h, 1)}°</text>
+      {/* current */}
+      <line x1={curX} y1={T} x2={curX} y2={T + PH} stroke={MARK} strokeDasharray="3 3" opacity={0.6} />
+      <text x={curX} y={T + 10} fill={MARK} fontSize={10} textAnchor="middle">현재 {fmt(o.hfov_deg, 1)}°</text>
+      {/* legend */}
+      <text x={L + 4} y={T + 12} fill={ACQ} fontSize={10}>─ P_acq(획득)</text>
+      <text x={L + 4} y={T + 25} fill={REC} fontSize={10}>─ 인식</text>
+      <text x={L + 4} y={T + 38} fill={CURVE} fontSize={10}>━ 곱(P_acq·인식)</text>
+    </Frame>
+  )
+}
+
 export const DIAGRAMS: Record<DiagramId, FC<DiagramProps>> = {
   'rcs-scaling': RcsScaling,
   'pd-logistic': PdLogistic,
@@ -334,4 +385,5 @@ export const DIAGRAMS: Record<DiagramId, FC<DiagramProps>> = {
   'johnson-n50': JohnsonN50,
   'pk-cumulative': PkCumulative,
   'closing-geometry': ClosingGeometry,
+  'fov-acquisition': FovAcquisition,
 }

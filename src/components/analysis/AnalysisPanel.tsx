@@ -127,6 +127,8 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <NumField label="가로 해상도" unit="px" value={o.h_resolution_px} step={10} paramKey="optics.h_resolution_px" onExplain={onExplain} onChange={(v) => setOptics({ h_resolution_px: v })} />
         <NumField label="센서 폭" unit="mm" value={o.sensor_width_mm} step={0.1} paramKey="optics.sensor_width_mm" onExplain={onExplain} onChange={(v) => setOptics({ sensor_width_mm: v })} />
         <NumField label="인식 요구픽셀 N50" unit="px" value={o.n50_recognition} step={1} paramKey="optics.n50_recognition" onExplain={onExplain} onChange={(v) => setOptics({ n50_recognition: v })} />
+        <NumField label="레이더 큐 오차" unit="°" value={o.cue_error_deg} step={0.1} paramKey="optics.cue_error_deg" onExplain={onExplain} onChange={(v) => setOptics({ cue_error_deg: v })} />
+        <NumField label="요격기 지향 오차" unit="°" value={o.pointing_error_deg} step={0.1} paramKey="optics.pointing_error_deg" onExplain={onExplain} onChange={(v) => setOptics({ pointing_error_deg: v })} />
         <p className="an-field-note ab-small">
           ≈ 초점거리 {focalLengthMm(o).toFixed(0)} mm (센서폭 {o.sensor_width_mm} mm 기준)
         </p>

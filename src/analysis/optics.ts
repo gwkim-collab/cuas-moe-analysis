@@ -75,6 +75,30 @@ export function recognitionRangeForProb(o: OpticalSensorSpec, size_m: number, pr
   return size_m / (N * ifovRad(o))
 }
 
+/** Combined 1σ pointing error (deg): radar cue ⊕ interceptor pointing, in quadrature. */
+export function pointingSigmaDeg(o: OpticalSensorSpec): number {
+  return Math.hypot(o.cue_error_deg, o.pointing_error_deg)
+}
+
+/**
+ * Acquisition probability — the chance the target actually lies inside the
+ * FIXED (gimbal-less) camera FOV. With 2D Gaussian pointing error of per-axis
+ * σ, the radial angular offset is Rayleigh-distributed, so the probability of
+ * being within a circular half-angle a = HFOV/2 is 1 − exp(−a²/(2σ²)).
+ * Horizontal half-angle is used (conservative for wider-than-tall frames).
+ *
+ * This is the term that penalises a narrow FOV: fewer degrees of coverage →
+ * the target is more likely to fall outside the frame. Combined with the
+ * Johnson recognition curve (which rewards a narrow FOV), P_classify has an
+ * optimum FOV rather than improving without bound as HFOV shrinks.
+ */
+export function acquisitionProb(o: OpticalSensorSpec): number {
+  const sigma = pointingSigmaDeg(o)
+  if (sigma <= 0) return 1
+  const a = o.hfov_deg / 2
+  return clamp(1 - Math.exp(-(a * a) / (2 * sigma * sigma)), 0, 1)
+}
+
 /** Focal length (mm) implied by the current HFOV and sensor width. */
 export function focalLengthMm(o: OpticalSensorSpec): number {
   return o.sensor_width_mm / (2 * Math.tan(hfovRad(o) / 2))

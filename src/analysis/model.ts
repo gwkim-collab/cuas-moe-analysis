@@ -60,6 +60,19 @@ export interface OpticalSensorSpec {
   sensor_width_mm: number
   /** Pixels across the target for 50% recognition (Johnson N50). SME-VERIFY */
   n50_recognition: number
+  /**
+   * Radar-cue angular error, 1σ (deg). This is a GIMBAL-LESS system: the
+   * camera is coarse-pointed by the radar cue, so cue bearing error is one
+   * component of whether the target lands inside the fixed FOV. SME-VERIFY
+   */
+  cue_error_deg: number
+  /**
+   * Interceptor forward-camera pointing error, 1σ (deg). The EO is body-fixed
+   * (no gimbal) and aimed by flying the interceptor, so guidance/LOS error is
+   * the other component of acquisition. Combined σ = √(cue² + pointing²) drives
+   * P_acq = probability the target is within ±HFOV/2. SME-VERIFY
+   */
+  pointing_error_deg: number
 }
 
 // ── Effector (interceptor: AB-U10 net-gun / shotgun) ──────────
@@ -131,9 +144,15 @@ export const DEFAULT_SENSOR: SensorSpec = {
 
 export const DEFAULT_OPTICS: OpticalSensorSpec = {
   h_resolution_px: 1920,
-  hfov_deg: 1.5, // narrow gimbal EO for recognition at range
+  hfov_deg: 1.5, // narrow EO for recognition at range (NO gimbal — see cue/pointing error)
   sensor_width_mm: 6.4,
   n50_recognition: 6,
+  // NOTE: a gimbal-less recognition-at-range concept only closes if the TOTAL
+  // pointing error stays sub-degree (√(cue²+point²) ≲ 0.5°); larger errors make
+  // P_acq collapse for any FOV narrow enough to recognise the target. These are
+  // aggressive design-target placeholders, NOT measured values — SME-VERIFY.
+  cue_error_deg: 0.3, // radar cue bearing accuracy, 1σ
+  pointing_error_deg: 0.4, // body-fixed camera pointing error, 1σ
 }
 
 export const DEFAULT_EFFECTOR: EffectorSpec = {

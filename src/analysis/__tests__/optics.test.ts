@@ -5,6 +5,8 @@ import {
   johnsonProb,
   recognitionProb,
   recognitionRangeForProb,
+  acquisitionProb,
+  pointingSigmaDeg,
   focalLengthMm,
   hfovDegFromFocal,
 } from '../index'
@@ -52,6 +54,35 @@ describe('recognition probability', () => {
   it('recognitionRangeForProb inverts to ~0.5 probability at that range', () => {
     const r50 = recognitionRangeForProb(O, 0.35, 0.5)
     expect(recognitionProb(O, 0.35, r50)).toBeCloseTo(0.5, 2)
+  })
+})
+
+describe('acquisition (gimbal-less FOV coverage)', () => {
+  it('combines cue and pointing error in quadrature', () => {
+    expect(pointingSigmaDeg({ ...O, cue_error_deg: 0.3, pointing_error_deg: 0.4 })).toBeCloseTo(0.5, 6)
+  })
+
+  it('a wider FOV raises acquisition probability', () => {
+    const narrow = acquisitionProb({ ...O, hfov_deg: 1 })
+    const wide = acquisitionProb({ ...O, hfov_deg: 4 })
+    expect(wide).toBeGreaterThan(narrow)
+  })
+
+  it('a larger pointing error lowers acquisition probability', () => {
+    const tight = acquisitionProb({ ...O, cue_error_deg: 0.2, pointing_error_deg: 0.2 })
+    const loose = acquisitionProb({ ...O, cue_error_deg: 2, pointing_error_deg: 3 })
+    expect(loose).toBeLessThan(tight)
+  })
+
+  it('→ 1 as pointing error → 0 (perfect pointing / effective gimbal)', () => {
+    expect(acquisitionProb({ ...O, cue_error_deg: 1e-6, pointing_error_deg: 1e-6 })).toBeCloseTo(1, 6)
+  })
+
+  it('matches the Rayleigh form 1 − exp(−(a²)/(2σ²))', () => {
+    const o = { ...O, hfov_deg: 1.5, cue_error_deg: 0.3, pointing_error_deg: 0.4 }
+    const a = o.hfov_deg / 2
+    const sigma = Math.hypot(o.cue_error_deg, o.pointing_error_deg)
+    expect(acquisitionProb(o)).toBeCloseTo(1 - Math.exp(-(a * a) / (2 * sigma * sigma)), 9)
   })
 })
 

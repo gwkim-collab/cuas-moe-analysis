@@ -25,7 +25,7 @@ import type { Scenario } from './model'
 import { computeDetection, type DetectionResult } from './detection'
 import { reachSolution, type ReachSolution } from './kinematics'
 import { effectorKillProbability, singleShotPk } from './engagement'
-import { pixelsOnTarget, recognitionProb, recognitionRangeForProb } from './optics'
+import { pixelsOnTarget, recognitionProb, recognitionRangeForProb, acquisitionProb, pointingSigmaDeg } from './optics'
 import { clamp } from './geometry'
 
 export interface MoeBreakdown {
@@ -46,6 +46,10 @@ export interface OpticsBreakdown {
   recognition_prob: number
   /** Range (m) at which recognition would be 50% for this target. */
   recognition_range_50_m: number
+  /** Combined 1σ pointing error (deg) driving acquisition. */
+  pointing_sigma_deg: number
+  /** Probability the target is inside the fixed (gimbal-less) FOV (0..1). */
+  acquisition_prob: number
 }
 
 export interface MoeResult {
@@ -84,16 +88,21 @@ export function computeMoe(s: Scenario): MoeResult {
   )
   const size = s.threat.characteristic_size_m
   const recognition_prob = recognitionProb(s.optics, size, classify_range_m)
+  const acquisition_prob = acquisitionProb(s.optics)
   const optics = {
     classify_range_m,
     pixels_on_target: pixelsOnTarget(s.optics, size, classify_range_m),
     recognition_prob,
     recognition_range_50_m: recognitionRangeForProb(s.optics, size, 0.5),
+    pointing_sigma_deg: pointingSigmaDeg(s.optics),
+    acquisition_prob,
   }
 
   const p_detect = clamp(detection.cumulative_pd, 0, 1)
-  // P_classify = optical recognition × classifier ceiling.
-  const p_classify = clamp(recognition_prob * s.sensor.classify_prob, 0, 1)
+  // P_classify = acquisition (target in the fixed FOV) × optical recognition
+  // × classifier ceiling. The acquisition term is what makes a too-narrow FOV
+  // hurt on a gimbal-less system.
+  const p_classify = clamp(acquisition_prob * recognition_prob * s.sensor.classify_prob, 0, 1)
   const p_decision = clamp(s.c2.decision_reliability, 0, 1)
   const p_reach = reach.feasible ? 1 : 0
   const p_kill = reach.feasible ? effectorKillProbability(s.effector) : 0

@@ -70,8 +70,11 @@ describe('tornado sensitivity', () => {
 
 describe('solveForTarget (spec inversion)', () => {
   it('finds the minimum camera resolution for a target P_negate (increasing)', () => {
+    // Target 0.4: reachable via resolution alone. (With the gimbal-less
+    // acquisition term now capping P_classify, higher targets like 0.6 are
+    // unreachable by resolution alone — recognition saturates but P_acq caps it.)
     const p = getParam('optics.h_resolution_px')!
-    const res = solveForTarget(defaultScenario(), p, 0.6, { min: 320, max: 12000, steps: 201 })
+    const res = solveForTarget(defaultScenario(), p, 0.4, { min: 320, max: 12000, steps: 201 })
     expect(res.direction).toBe('increasing')
     expect(res.satisfy_side).toBe('gte')
     expect(res.found).toBe(true)
@@ -79,8 +82,8 @@ describe('solveForTarget (spec inversion)', () => {
     // Boundary property: below the solved resolution the target fails, above it meets.
     const below = computeMoe(p.set(defaultScenario(), res.threshold_value! * 0.6)).p_negate
     const above = computeMoe(p.set(defaultScenario(), res.threshold_value! * 1.6)).p_negate
-    expect(below).toBeLessThan(0.6 + 1e-6)
-    expect(above).toBeGreaterThanOrEqual(0.6 - 1e-6)
+    expect(below).toBeLessThan(0.4 + 1e-6)
+    expect(above).toBeGreaterThanOrEqual(0.4 - 1e-6)
   })
 
   it('detects a decreasing relationship for decision latency', () => {

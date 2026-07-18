@@ -64,7 +64,7 @@ export default function MoeResultCards({ result }: Props) {
       <div className="an-card">
         <div className="ab-label">EO/IR 인식 · 광학</div>
         <div className="an-gate-note ab-small">
-          표적 픽셀 수 → Johnson 인식확률 → P_classify (× 분류기 상한)
+          P_classify = 획득 P_acq × Johnson 인식확률 × 분류기 상한 (짐벌 없음 · 고정 FOV)
         </div>
         <dl className="an-readout">
           <div><dt>분류 완료 거리</dt><dd>{optics.classify_range_m.toFixed(0)} m</dd></div>
@@ -73,6 +73,10 @@ export default function MoeResultCards({ result }: Props) {
           </div>
           <div><dt>인식 확률</dt><dd>{pct(optics.recognition_prob)}</dd></div>
           <div><dt>50% 인식 거리</dt><dd>{optics.recognition_range_50_m.toFixed(0)} m</dd></div>
+          <div><dt>지향 오차 σ (큐⊕지향)</dt><dd>{optics.pointing_sigma_deg.toFixed(2)}°</dd></div>
+          <div className={optics.acquisition_prob >= 0.5 ? '' : 'bad'}>
+            <dt>획득 확률 P_acq</dt><dd>{pct(optics.acquisition_prob)}</dd>
+          </div>
         </dl>
       </div>
 
