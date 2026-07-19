@@ -7,6 +7,7 @@ import {
   cumulativePk,
   reachSolution,
   computeDetection,
+  diagnoseBottleneck,
   type Scenario,
 } from '../index'
 
@@ -127,6 +128,22 @@ describe('computeMoe composition', () => {
     expect(r.breakdown.p_reach).toBe(0)
     expect(r.p_negate).toBe(0)
     expect(r.leakage).toBe(1)
+  })
+
+  it('bottleneck diagnosis picks the lowest gate and gives a recommendation', () => {
+    const r = computeMoe(scn())
+    const d = diagnoseBottleneck(r)
+    const gates = Object.values(r.breakdown)
+    expect(d.value).toBeCloseTo(Math.min(...gates), 9)
+    expect(d.recommendation.length).toBeGreaterThan(0)
+  })
+
+  it('bottleneck flags classify sub-factor when classify is limiting', () => {
+    const s = scn()
+    s.optics.visibility_km = 0.8 // fog → transmission dominates the classify loss
+    const d = diagnoseBottleneck(computeMoe(s))
+    expect(d.stage).toBe('classify')
+    expect(d.subFactor?.label).toContain('대기 투과')
   })
 
   it('p_negate never exceeds any single gate probability', () => {

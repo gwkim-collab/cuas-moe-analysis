@@ -519,6 +519,28 @@ button.an-field-info:hover { opacity: 1; }
 .an-btn-mini:disabled { opacity: 0.4; cursor: default; }
 .an-ref-explain { text-align: right; }
 
+/* ── bottleneck diagnosis card ─────────────────────────────── */
+.an-bottleneck {
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--r-2);
+  padding: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+.an-bn-head { display: flex; align-items: baseline; gap: var(--s-2); flex-wrap: wrap; }
+.an-bn-tag {
+  font-size: var(--fs-micro); color: var(--amber); border: 1px solid var(--amber);
+  border-radius: var(--r-1); padding: 1px 6px; letter-spacing: var(--ls-label);
+}
+.an-bn-stage { font-family: var(--font-display); font-weight: 700; color: var(--text); }
+.an-bn-val { font-family: var(--font-mono); color: var(--amber); font-weight: 700; }
+.an-bn-sub { font-size: var(--fs-micro); color: var(--text3); }
+.an-bn-reco { margin-top: 6px; font-size: var(--fs-small); color: var(--text2); line-height: var(--lh-normal); }
+.an-cov-bottleneck { padding: var(--s-2) var(--s-3); color: var(--text2); border-bottom: 1px solid var(--border); }
+.an-cov-bottleneck b { color: var(--amber); }
+.an-cov-bn-note { color: var(--text3); }
+
 /* ── A/B compare view ──────────────────────────────────────── */
 .an-cmp-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-2); }
 .an-cmp-select { flex: 0 1 240px; }

@@ -1,4 +1,4 @@
-import type { MoeResult } from '../../analysis'
+import { diagnoseBottleneck, type MoeResult } from '../../analysis'
 
 interface Props {
   result: MoeResult
@@ -48,6 +48,22 @@ export default function MoeResultCards({ result }: Props) {
       {!feasible && reach.reason && (
         <div className="an-reason">불성립 사유: {reach.reason}</div>
       )}
+
+      {/* Bottleneck diagnosis — the limiting kill-chain stage + what to fix */}
+      {(() => {
+        const d = diagnoseBottleneck(result)
+        return (
+          <div className="an-bottleneck">
+            <div className="an-bn-head">
+              <span className="an-bn-tag">제약 단계</span>
+              <span className="an-bn-stage">{d.label}</span>
+              <span className="an-bn-val">{pct(d.value)}</span>
+              {d.subFactor ? <span className="an-bn-sub">· 최약: {d.subFactor.label} {pct(d.subFactor.value)}</span> : null}
+            </div>
+            <div className="an-bn-reco">→ {d.recommendation}</div>
+          </div>
+        )
+      })()}
 
       {/* Kill-chain gate breakdown */}
       <div className="an-card">

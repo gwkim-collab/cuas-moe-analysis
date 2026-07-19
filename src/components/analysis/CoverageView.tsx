@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { computeCoverage, type Scenario } from '../../analysis'
+import { computeCoverage, computeMoe, diagnoseBottleneck, type Scenario } from '../../analysis'
 import CoverageMap from './CoverageMap'
 
 interface Props {
@@ -20,9 +20,15 @@ export default function CoverageView({ scenario }: Props) {
     () => computeCoverage(scenario, { bearings: 72, threshold: 0.7 }),
     [scenario],
   )
+  const bottleneck = useMemo(() => diagnoseBottleneck(computeMoe(scenario)), [scenario])
 
   return (
     <div className="an-coverage">
+      <div className="an-cov-bottleneck ab-small">
+        제약 단계 <b>{bottleneck.label}</b> {pct(bottleneck.value)}
+        {bottleneck.subFactor ? ` · 최약 ${bottleneck.subFactor.label} ${pct(bottleneck.subFactor.value)}` : ''}
+        <span className="an-cov-bn-note"> — 모델이 방위 회전대칭이라 전 방위 동일</span>
+      </div>
       <div className="an-coverage-summary">
         <div className="an-cov-metric">
           <div className="ab-spec">평균 P_NEGATE</div>

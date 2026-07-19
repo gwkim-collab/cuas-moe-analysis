@@ -72,6 +72,18 @@ export const PRESETS: ScenarioPreset[] = [
         threat: { ingress_range_m: 1500, speed_m_s: 40 },
       }),
   },
+  {
+    id: 'fog-low-vis',
+    label: '안개 · 저시정',
+    note: '시정 1.5km — 대기감쇠로 원거리 인식·분류가 급감.',
+    build: () => withOverrides({ optics: { visibility_km: 1.5 } }),
+  },
+  {
+    id: 'night-degraded',
+    label: '야간 · EO 저하',
+    note: '저조도(대비↓)+조준 난이도↑ — 시정 8km·지향오차 0.8°.',
+    build: () => withOverrides({ optics: { visibility_km: 8, pointing_error_deg: 0.8 } }),
+  },
 ]
 
 export function presetById(id: string): ScenarioPreset | undefined {

@@ -55,6 +55,10 @@ export interface McUncertainty {
   decision_latency_sd_s: number
   /** Std-dev (s) added to launch delay. */
   launch_delay_sd_s: number
+  /** Std-dev (deg) added to the interceptor pointing error (acquisition jitter). */
+  pointing_error_sd_deg: number
+  /** Coefficient of variation on atmospheric visibility (multiplicative). */
+  visibility_cv: number
   /** Randomise the approach bearing uniformly over 0..360°. */
   bearing_uniform: boolean
 }
@@ -65,6 +69,8 @@ export const DEFAULT_UNCERTAINTY: McUncertainty = {
   classify_time_sd_s: 2,
   decision_latency_sd_s: 4,
   launch_delay_sd_s: 1,
+  pointing_error_sd_deg: 0.15,
+  visibility_cv: 0.25,
   bearing_uniform: true,
 }
 
@@ -107,6 +113,9 @@ function sampleScenario(base: Scenario, u: McUncertainty, rng: Rng): Scenario {
     ? rng.next() * 360
     : base.threat.approach_bearing_deg
 
+  const pointing = Math.max(0, base.optics.pointing_error_deg + u.pointing_error_sd_deg * normal(rng))
+  const visibility = Math.max(0.05, base.optics.visibility_km * (1 + u.visibility_cv * normal(rng)))
+
   return {
     ...base,
     threat: {
@@ -114,6 +123,11 @@ function sampleScenario(base: Scenario, u: McUncertainty, rng: Rng): Scenario {
       speed_m_s: speed,
       rcs_m2: rcs,
       approach_bearing_deg: bearing,
+    },
+    optics: {
+      ...base.optics,
+      pointing_error_deg: pointing,
+      visibility_km: visibility,
     },
     sensor: {
       ...base.sensor,
