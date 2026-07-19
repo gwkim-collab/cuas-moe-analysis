@@ -10,6 +10,8 @@
 import type { Scenario } from './model'
 import { computeMoe, type MoeResult } from './moe'
 import { computeCoverage, type CoverageResult } from './coverage'
+import { PARAM_INFO } from './params'
+import { paramExplain } from './paramExplain'
 
 export interface AnalysisReport {
   generated_at: string
@@ -77,7 +79,21 @@ export function reportToMarkdown(report: AnalysisReport): string {
   lines.push(`| 요격 거리 (자산 기준) | ${e.reach.intercept_range_m.toFixed(0)} m |`)
   lines.push(`| Keep-out 여유 | ${e.reach.margin_m.toFixed(0)} m · ${e.reach.margin_s.toFixed(1)} s |`)
   lines.push('')
-  lines.push('## 2. 방어 커버리지 (360° 스윕)')
+  lines.push('## 2. EO/IR 인식 · 획득 (P_classify 구성)')
+  lines.push('')
+  lines.push('> P_classify = 획득 P_acq × Johnson 인식확률 × 대기투과 × 분류기 상한 (짐벌 없음 · 고정 FOV)')
+  lines.push('')
+  lines.push('| 지표 | 값 |')
+  lines.push('|---|---|')
+  lines.push(`| 분류 완료 거리 (LOS 경사거리) | ${e.optics.classify_range_m.toFixed(0)} m |`)
+  lines.push(`| 표적 픽셀 수 | ${e.optics.pixels_on_target.toFixed(1)} px |`)
+  lines.push(`| 인식 확률 (Johnson) | ${pct(e.optics.recognition_prob)} |`)
+  lines.push(`| 획득 확률 P_acq | ${pct(e.optics.acquisition_prob)} |`)
+  lines.push(`| 지향 오차 σ (큐⊕지향) | ${e.optics.pointing_sigma_deg.toFixed(2)}° |`)
+  lines.push(`| 대기 투과 (시정) | ${pct(e.optics.atmospheric_transmission)} |`)
+  lines.push(`| 50% 인식 거리 | ${e.optics.recognition_range_50_m.toFixed(0)} m |`)
+  lines.push('')
+  lines.push('## 3. 방어 커버리지 (360° 스윕)')
   lines.push('')
   lines.push('| 지표 | 값 |')
   lines.push('|---|---|')
@@ -87,11 +103,24 @@ export function reportToMarkdown(report: AnalysisReport): string {
   lines.push(`| 최대 교전 반경 | ${c.max_engagement_range_m.toFixed(0)} m |`)
   lines.push(`| Keep-out 반경 | ${c.keep_out_radius_m.toFixed(0)} m |`)
   lines.push('')
-  lines.push('## 3. 입력 파라미터')
+  lines.push('## 4. 입력 파라미터')
   lines.push('')
   lines.push('```json')
   lines.push(JSON.stringify(s, null, 2))
   lines.push('```')
+  lines.push('')
+  lines.push('## 5. 파라미터 근거 (이론 · 값 출처)')
+  lines.push('')
+  lines.push('| 파라미터 | 현재값 | 의미 | 이론 근거 | 값 출처 |')
+  lines.push('|---|---|---|---|---|')
+  const esc = (t: string) => t.replace(/\|/g, '\\|').replace(/\n/g, ' ')
+  for (const p of PARAM_INFO) {
+    const ex = paramExplain(p.key)
+    const val = p.get(s)
+    lines.push(
+      `| ${p.label}${p.unit ? ` (${p.unit})` : ''} | ${val} | ${esc(p.description)} | ${esc(ex?.theory ?? '—')} | ${esc(p.source)} |`,
+    )
+  }
   lines.push('')
   lines.push('---')
   lines.push('')
