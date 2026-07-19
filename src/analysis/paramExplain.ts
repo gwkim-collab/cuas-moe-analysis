@@ -62,10 +62,11 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
     diagram: 'closing-geometry',
   },
   'threat.altitude_m_agl': {
-    theory: '현재 해석 모델은 수평 반경 기하 — 고도는 미반영(정보용).',
-    assumption: '수평 거리 기반 2D 기하. 3D 경사거리(slant range)로 확장 시 반영.',
-    formula: '(현재 모델: 고도 미반영)',
-    detail: '고도는 계산에 들어가지 않고 표기용입니다. slant-range 모델로 확장하면 탐지·교전 기하에 들어갑니다.',
+    theory: '지상 센서 LOS = 경사거리 √(수평² + 고도²).',
+    assumption: '탐지·EO 인식·대기투과에 경사거리 반영. 교전 기하(closing)는 수평 반경 유지(가정).',
+    formula: 'r_slant = √(수평² + 고도²)\n탐지·인식은 r_slant로 평가',
+    detail:
+      '같은 지상거리라도 고도가 높으면 LOS 경사거리가 길어져 탐지·인식이 어려워집니다(고고도 표적 불리). 현재는 센싱에만 반영하고, 요격 closing 기하는 수평으로 둡니다.',
   },
   'threat.ingress_range_m': {
     theory: `${REF_SERIES}: 누적 탐지 P_det = 1 − Π(1 − p_i).`,

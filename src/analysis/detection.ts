@@ -17,7 +17,7 @@
 // ────────────────────────────────────────────────────────────
 
 import type { SensorSpec, ThreatSpec } from './model'
-import { clamp } from './geometry'
+import { clamp, slantRange } from './geometry'
 
 /** Nominal detection range (m) for a target of the given RCS. */
 export function detectionRangeForRcs(sensor: SensorSpec, rcs_m2: number): number {
@@ -68,12 +68,16 @@ export function computeDetection(
   let detectAt = nominal
   let foundDetect = false
 
+  // `range` is the horizontal (ground) range; the radar sees the slant range
+  // √(range² + altitude²). detectAt is reported as the horizontal range (the
+  // kinematics timeline is horizontal-radial), but Pd is evaluated on slant.
   for (
     let range = threat.ingress_range_m;
     range >= keep_out_radius_m;
     range -= step_m
   ) {
-    const pd = pdAtRange(sensor, threat.rcs_m2, range)
+    const slant = slantRange(range, threat.altitude_m_agl)
+    const pd = pdAtRange(sensor, threat.rcs_m2, slant)
     survivalMiss *= 1 - pd
     if (!foundDetect && pd >= 0.5) {
       detectAt = range

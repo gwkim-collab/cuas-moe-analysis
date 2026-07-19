@@ -79,3 +79,13 @@ export function angularDeltaDeg(a: number, b: number): number {
 export function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x))
 }
+
+/**
+ * Line-of-sight (slant) range from a ground sensor to a target at horizontal
+ * range `horizontal_m` and altitude `altitude_m`: √(h² + alt²). This is what
+ * the radar / EO actually sees, so detection and recognition use it — a target
+ * at the same ground range but higher altitude is farther in LOS, hence harder.
+ */
+export function slantRange(horizontal_m: number, altitude_m: number): number {
+  return Math.hypot(horizontal_m, altitude_m)
+}

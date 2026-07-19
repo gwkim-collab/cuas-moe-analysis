@@ -26,7 +26,7 @@ import { computeDetection, type DetectionResult } from './detection'
 import { reachSolution, type ReachSolution } from './kinematics'
 import { effectorKillProbability, singleShotPk } from './engagement'
 import { pixelsOnTarget, recognitionProb, recognitionRangeForProb, acquisitionProb, pointingSigmaDeg, atmosphericTransmission } from './optics'
-import { clamp } from './geometry'
+import { clamp, slantRange } from './geometry'
 
 export interface MoeBreakdown {
   p_detect: number
@@ -83,11 +83,13 @@ export function computeMoe(s: Scenario): MoeResult {
 
   // EO/IR recognition · classification concludes classify_time after the
   // radar detection, by which point the threat has closed. Recognition is
-  // evaluated at that (closer) range — more pixels on target = easier.
-  const classify_range_m = Math.max(
+  // evaluated at that (closer) range — more pixels on target = easier. The EO
+  // sees the slant (LOS) range, so optics use √(horizontal² + altitude²).
+  const classify_h_m = Math.max(
     1,
     detection.detect_at_range_m - s.threat.speed_m_s * s.sensor.classify_time_s,
   )
+  const classify_range_m = slantRange(classify_h_m, s.threat.altitude_m_agl)
   const size = s.threat.characteristic_size_m
   const recognition_prob = recognitionProb(s.optics, size, classify_range_m)
   const acquisition_prob = acquisitionProb(s.optics)

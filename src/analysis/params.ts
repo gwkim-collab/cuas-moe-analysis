@@ -60,8 +60,8 @@ export const PARAM_INFO: ParamInfo[] = [
   },
   {
     key: 'threat.altitude_m_agl', section: '위협', label: '고도 AGL', unit: 'm',
-    description: '진입 고도(정보용). 현재 해석 모델(수평 반경 기하)에는 미반영.',
-    source: `목업 기준 · 정보 표기용`,
+    description: '진입 고도 AGL. 지상 센서 LOS 경사거리 √(수평²+고도²)로 탐지·EO 인식·대기투과에 반영(교전 기하는 수평).',
+    source: `참고: 목업 기준 · ${PLACEHOLDER}`,
     get: (s) => s.threat.altitude_m_agl, set: S('threat', 'altitude_m_agl'),
   },
   {

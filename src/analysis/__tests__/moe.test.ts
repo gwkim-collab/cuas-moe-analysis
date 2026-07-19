@@ -32,6 +32,16 @@ describe('detection model', () => {
     expect(pdClose).toBeGreaterThan(pdAtEdge)
   })
 
+  it('higher altitude (longer slant range) lowers recognition and P_negate', () => {
+    const low = scn(); low.threat.altitude_m_agl = 85
+    const high = scn(); high.threat.altitude_m_agl = 3000
+    const rLow = computeMoe(low)
+    const rHigh = computeMoe(high)
+    expect(rHigh.optics.classify_range_m).toBeGreaterThan(rLow.optics.classify_range_m)
+    expect(rHigh.optics.recognition_prob).toBeLessThan(rLow.optics.recognition_prob)
+    expect(rHigh.p_negate).toBeLessThan(rLow.p_negate)
+  })
+
   it('smaller RCS lowers cumulative detection probability', () => {
     const big = scn()
     const small = scn()
