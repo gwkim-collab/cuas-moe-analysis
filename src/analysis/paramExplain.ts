@@ -177,6 +177,13 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
       '전방 고정 카메라를 비행(유도)으로 조준할 때의 LOS 지향 오차(1σ). 짐벌이 없으므로 이 오차가 커질수록 좁은 화각에서 표적을 프레임에 유지하기 어려워 P_acq가 급감합니다.',
     diagram: 'fov-acquisition',
   },
+  'optics.visibility_km': {
+    theory: 'Koschmieder(β=3.912/V, 2% 대비) + Beer-Lambert 투과 T=exp(−βR).',
+    assumption: '균질 대기·수평 경로 근사. 대비 손실만 반영(해상도 저하 별도).',
+    formula: 'β = 3.912 / V(km)\nT(R) = exp(−β · R)\nP_classify ∝ … × T',
+    detail:
+      '시정이 낮을수록 대기 투과가 지수적으로 떨어져 원거리 인식·분류확률이 급감합니다. 안개(≪1km)에선 사실상 원거리 교전이 불가. P_classify에 곱해집니다.',
+  },
 
   // ── 이팩터 ──────────────────────────────────────────────
   'effector.launch_delay_s': {
@@ -223,6 +230,21 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
     formula: 'P_k = 1 − (1 − p)ⁿ',
     detail: '교전창 안 사격/패스 횟수 n. n↑이면 누적 살상확률↑이나 한계효용은 체감.',
     diagram: 'pk-cumulative',
+  },
+  'effector.endurance_s': {
+    theory: '유효 반경은 물리 도달거리와 스펙 최대치 중 작은 값.',
+    formula: '유효 반경 = min(최대교전거리, v_i · 체공시간)',
+    detail:
+      '체공이 짧으면 순항속도로 갈 수 있는 거리가 최대교전거리보다 작아져 먼 요격이 불가능해집니다. 기본값에선 v_i·체공 ≫ 최대교전거리라 구속되지 않습니다.',
+    diagram: 'closing-geometry',
+  },
+  'effector.reach_margin_sigma_m': {
+    theory: '여유 불확실성 가정 하 정규 CDF로 도달 확률화.',
+    assumption: '여유 오차 정규분포. σ→0이면 하드 0/1 게이트로 수렴.',
+    formula: 'P_reach = Φ(여유_m / σ)',
+    detail:
+      '타이밍·속도·기하 지터로 Keep-out 여유가 흔들릴 때, 0/1 대신 연속 확률로 P_reach를 계산합니다. σ가 클수록 경계 근처에서 완만해집니다. 도달 불가(발사 불가·유효반경 초과)면 0.',
+    diagram: 'closing-geometry',
   },
 
   // ── C2 ──────────────────────────────────────────────────

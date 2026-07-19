@@ -7,6 +7,7 @@ import {
   recognitionRangeForProb,
   acquisitionProb,
   pointingSigmaDeg,
+  atmosphericTransmission,
   focalLengthMm,
   hfovDegFromFocal,
 } from '../index'
@@ -83,6 +84,25 @@ describe('acquisition (gimbal-less FOV coverage)', () => {
     const a = o.hfov_deg / 2
     const sigma = Math.hypot(o.cue_error_deg, o.pointing_error_deg)
     expect(acquisitionProb(o)).toBeCloseTo(1 - Math.exp(-(a * a) / (2 * sigma * sigma)), 9)
+  })
+})
+
+describe('atmospheric transmission (Koschmieder / Beer-Lambert)', () => {
+  it('→ 1 at zero range, decreases with range', () => {
+    expect(atmosphericTransmission(O, 0)).toBeCloseTo(1, 6)
+    expect(atmosphericTransmission(O, 3000)).toBeLessThan(atmosphericTransmission(O, 1000))
+  })
+
+  it('lower visibility lowers transmission at the same range', () => {
+    const clear = atmosphericTransmission({ ...O, visibility_km: 40 }, 2000)
+    const haze = atmosphericTransmission({ ...O, visibility_km: 5 }, 2000)
+    expect(haze).toBeLessThan(clear)
+  })
+
+  it('matches T = exp(-(3.912/V)·R_km)', () => {
+    const V = 15
+    const R = 2500
+    expect(atmosphericTransmission({ ...O, visibility_km: V }, R)).toBeCloseTo(Math.exp(-(3.912 / V) * (R / 1000)), 9)
   })
 })
 

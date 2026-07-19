@@ -99,6 +99,18 @@ export function acquisitionProb(o: OpticalSensorSpec): number {
   return clamp(1 - Math.exp(-(a * a) / (2 * sigma * sigma)), 0, 1)
 }
 
+/**
+ * Atmospheric transmission (0..1) over a slant/line-of-sight range, from
+ * visibility via Koschmieder (β = 3.912 / V_km, the 2%-contrast extinction
+ * coefficient) and Beer-Lambert (T = exp(−β·R)). Contrast loss, not blur —
+ * it multiplies recognition/classification, it does not change pixel count.
+ */
+export function atmosphericTransmission(o: OpticalSensorSpec, range_m: number): number {
+  const V = Math.max(o.visibility_km, 0.01)
+  const beta = 3.912 / V // per km
+  return clamp(Math.exp(-beta * (range_m / 1000)), 0, 1)
+}
+
 /** Focal length (mm) implied by the current HFOV and sensor width. */
 export function focalLengthMm(o: OpticalSensorSpec): number {
   return o.sensor_width_mm / (2 * Math.tan(hfovRad(o) / 2))

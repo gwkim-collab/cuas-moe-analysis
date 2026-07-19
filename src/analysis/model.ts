@@ -73,6 +73,12 @@ export interface OpticalSensorSpec {
    * P_acq = probability the target is within ±HFOV/2. SME-VERIFY
    */
   pointing_error_deg: number
+  /**
+   * Atmospheric visibility (km). Drives EO/IR contrast loss with range via
+   * Koschmieder (β = 3.912/V) + Beer-Lambert transmission T = exp(−β·R).
+   * Clear day ≈ 20-40 km, haze ≈ 5-10 km, fog ≪ 1 km. SME-VERIFY
+   */
+  visibility_km: number
 }
 
 // ── Effector (interceptor: AB-U10 net-gun / shotgun) ──────────
@@ -92,6 +98,19 @@ export interface EffectorSpec {
   single_shot_pk_shotgun: number
   /** Number of shot / pass opportunities in the engagement window. SME-VERIFY */
   shot_opportunities: number
+  /**
+   * Interceptor endurance (s). Caps the usable reach to cruise_speed·endurance,
+   * so a slow/short-legged interceptor can't reach a far intercept even if the
+   * quoted max range allows it. Effective reach = min(max_range, v_i·endurance).
+   * SME-VERIFY
+   */
+  endurance_s: number
+  /**
+   * 1σ uncertainty (m) on the keep-out standoff margin, used to soften the
+   * analytical P_reach from a hard 0/1 gate into Φ(margin/σ). Captures timing /
+   * speed / geometry jitter without a full Monte Carlo. SME-VERIFY
+   */
+  reach_margin_sigma_m: number
 }
 
 // ── C2 (decision layer) ───────────────────────────────────────
@@ -153,6 +172,7 @@ export const DEFAULT_OPTICS: OpticalSensorSpec = {
   // aggressive design-target placeholders, NOT measured values — SME-VERIFY.
   cue_error_deg: 0.3, // radar cue bearing accuracy, 1σ
   pointing_error_deg: 0.4, // body-fixed camera pointing error, 1σ
+  visibility_km: 40, // atmospheric visibility (clear day baseline) — SME-VERIFY
 }
 
 export const DEFAULT_EFFECTOR: EffectorSpec = {
@@ -164,6 +184,8 @@ export const DEFAULT_EFFECTOR: EffectorSpec = {
   single_shot_pk_net: 0.7,
   single_shot_pk_shotgun: 0.6,
   shot_opportunities: 2,
+  endurance_s: 1200, // ~20 min — v_i·endurance ≫ max_range at defaults (non-binding) — SME-VERIFY
+  reach_margin_sigma_m: 200, // standoff margin 1σ — SME-VERIFY
 }
 
 export const DEFAULT_C2: C2Spec = {

@@ -133,6 +133,7 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <NumField label="인식 요구픽셀 N50" unit="px" value={o.n50_recognition} step={1} paramKey="optics.n50_recognition" onExplain={onExplain} onChange={(v) => setOptics({ n50_recognition: v })} />
         <NumField label="레이더 큐 오차" unit="°" value={o.cue_error_deg} step={0.1} paramKey="optics.cue_error_deg" onExplain={onExplain} onChange={(v) => setOptics({ cue_error_deg: v })} />
         <NumField label="요격기 지향 오차" unit="°" value={o.pointing_error_deg} step={0.1} paramKey="optics.pointing_error_deg" onExplain={onExplain} onChange={(v) => setOptics({ pointing_error_deg: v })} />
+        <NumField label="대기 시정" unit="km" value={o.visibility_km} step={0.5} paramKey="optics.visibility_km" onExplain={onExplain} onChange={(v) => setOptics({ visibility_km: v })} />
         <p className="an-field-note ab-small">
           ≈ 초점거리 {focalLengthMm(o).toFixed(0)} mm (센서폭 {o.sensor_width_mm} mm 기준)
         </p>
@@ -160,6 +161,8 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <NumField label="단발 Pk · net" value={e.single_shot_pk_net} step={0.01} paramKey="effector.single_shot_pk_net" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_net: v })} />
         <NumField label="단발 Pk · shotgun" value={e.single_shot_pk_shotgun} step={0.01} paramKey="effector.single_shot_pk_shotgun" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_shotgun: v })} />
         <NumField label="사격 기회 수" value={e.shot_opportunities} step={1} paramKey="effector.shot_opportunities" onExplain={onExplain} onChange={(v) => setEffector({ shot_opportunities: v })} />
+        <NumField label="체공 시간" unit="s" value={e.endurance_s} step={30} paramKey="effector.endurance_s" onExplain={onExplain} onChange={(v) => setEffector({ endurance_s: v })} />
+        <NumField label="여유 σ" unit="m" value={e.reach_margin_sigma_m} step={10} paramKey="effector.reach_margin_sigma_m" onExplain={onExplain} onChange={(v) => setEffector({ reach_margin_sigma_m: v })} />
       </fieldset>
 
       <fieldset className="an-group">

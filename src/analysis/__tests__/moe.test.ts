@@ -74,6 +74,26 @@ describe('reach kinematics monotonicity', () => {
     const r = reachSolution(s, d.detect_at_range_m)
     expect(r.feasible).toBe(false)
   })
+
+  it('short endurance caps usable reach and can make intercept infeasible', () => {
+    const s = scn()
+    s.effector.endurance_s = 10 // v_i·10 = 500 m ≪ intercept range
+    const d = computeDetection(s.sensor, s.threat, s.site.keep_out_radius_m)
+    const r = reachSolution(s, d.detect_at_range_m)
+    expect(r.feasible).toBe(false)
+    expect(r.reach_probability).toBe(0)
+  })
+
+  it('reach probability is continuous: larger margin σ softens toward 0.5 near the edge', () => {
+    const s = scn()
+    const d = computeDetection(s.sensor, s.threat, s.site.keep_out_radius_m)
+    // small σ → near-certain when margin is comfortably positive
+    s.effector.reach_margin_sigma_m = 1
+    expect(reachSolution(s, d.detect_at_range_m).reach_probability).toBeGreaterThan(0.99)
+    // huge σ → margin uncertainty dominates, pulls toward 0.5
+    s.effector.reach_margin_sigma_m = 100000
+    expect(reachSolution(s, d.detect_at_range_m).reach_probability).toBeLessThan(0.9)
+  })
 })
 
 describe('computeMoe composition', () => {

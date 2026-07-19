@@ -164,6 +164,12 @@ export const PARAM_INFO: ParamInfo[] = [
     source: `추천 기본값 0.4°(sub-degree 설계목표) · 실측/스펙 입력 필요(SME)`,
     get: (s) => s.optics.pointing_error_deg, set: S('optics', 'pointing_error_deg'), sweep: { min: 0, max: 10 },
   },
+  {
+    key: 'optics.visibility_km', section: 'EO/IR', label: '대기 시정', unit: 'km',
+    description: '대기 투과(대비 손실)를 정하는 시정. 낮을수록 원거리 인식·분류확률이 지수적으로 감소.',
+    source: `기상/환경 입력 · ${PLACEHOLDER}`,
+    get: (s) => s.optics.visibility_km, set: S('optics', 'visibility_km'), sweep: { min: 0.5, max: 40 },
+  },
 
   // ── 이팩터 ──────────────────────────────────────────────
   {
@@ -207,6 +213,18 @@ export const PARAM_INFO: ParamInfo[] = [
     description: '교전창 내 사격/패스 횟수 n. 누적 Pk=1−(1−p)^n.',
     source: `${PLACEHOLDER}`,
     get: (s) => s.effector.shot_opportunities, set: S('effector', 'shot_opportunities'), sweep: { min: 1, max: 8 },
+  },
+  {
+    key: 'effector.endurance_s', section: '이팩터', label: '체공 시간', unit: 's',
+    description: '요격기 체공 한계. 유효 반경을 순항속도×체공시간으로 제한(최대교전거리와 함께 min).',
+    source: `이팩터 스펙(입력) · ${PLACEHOLDER}`,
+    get: (s) => s.effector.endurance_s, set: S('effector', 'endurance_s'), sweep: { min: 60, max: 3600 },
+  },
+  {
+    key: 'effector.reach_margin_sigma_m', section: '이팩터', label: '여유 σ', unit: 'm',
+    description: 'Keep-out 여유의 1σ 불확실성. P_reach를 0/1 대신 Φ(여유/σ)로 연속화(0=하드 게이트).',
+    source: `모델 파라미터(입력) · ${PLACEHOLDER}`,
+    get: (s) => s.effector.reach_margin_sigma_m, set: S('effector', 'reach_margin_sigma_m'), sweep: { min: 0, max: 800 },
   },
 
   // ── C2 ──────────────────────────────────────────────────

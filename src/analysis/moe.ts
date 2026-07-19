@@ -25,7 +25,7 @@ import type { Scenario } from './model'
 import { computeDetection, type DetectionResult } from './detection'
 import { reachSolution, type ReachSolution } from './kinematics'
 import { effectorKillProbability, singleShotPk } from './engagement'
-import { pixelsOnTarget, recognitionProb, recognitionRangeForProb, acquisitionProb, pointingSigmaDeg } from './optics'
+import { pixelsOnTarget, recognitionProb, recognitionRangeForProb, acquisitionProb, pointingSigmaDeg, atmosphericTransmission } from './optics'
 import { clamp } from './geometry'
 
 export interface MoeBreakdown {
@@ -50,6 +50,8 @@ export interface OpticsBreakdown {
   pointing_sigma_deg: number
   /** Probability the target is inside the fixed (gimbal-less) FOV (0..1). */
   acquisition_prob: number
+  /** Atmospheric transmission at the classify range (0..1). */
+  atmospheric_transmission: number
 }
 
 export interface MoeResult {
@@ -89,6 +91,7 @@ export function computeMoe(s: Scenario): MoeResult {
   const size = s.threat.characteristic_size_m
   const recognition_prob = recognitionProb(s.optics, size, classify_range_m)
   const acquisition_prob = acquisitionProb(s.optics)
+  const atmospheric_transmission = atmosphericTransmission(s.optics, classify_range_m)
   const optics = {
     classify_range_m,
     pixels_on_target: pixelsOnTarget(s.optics, size, classify_range_m),
@@ -96,16 +99,23 @@ export function computeMoe(s: Scenario): MoeResult {
     recognition_range_50_m: recognitionRangeForProb(s.optics, size, 0.5),
     pointing_sigma_deg: pointingSigmaDeg(s.optics),
     acquisition_prob,
+    atmospheric_transmission,
   }
 
   const p_detect = clamp(detection.cumulative_pd, 0, 1)
   // P_classify = acquisition (target in the fixed FOV) × optical recognition
-  // × classifier ceiling. The acquisition term is what makes a too-narrow FOV
-  // hurt on a gimbal-less system.
-  const p_classify = clamp(acquisition_prob * recognition_prob * s.sensor.classify_prob, 0, 1)
+  // × atmospheric transmission (contrast loss) × classifier ceiling. Acquisition
+  // is what makes a too-narrow FOV hurt on a gimbal-less system.
+  const p_classify = clamp(
+    acquisition_prob * recognition_prob * atmospheric_transmission * s.sensor.classify_prob,
+    0,
+    1,
+  )
   const p_decision = clamp(s.c2.decision_reliability, 0, 1)
-  const p_reach = reach.feasible ? 1 : 0
-  const p_kill = reach.feasible ? effectorKillProbability(s.effector) : 0
+  // Continuous reach (softened by margin σ, 0 if geometry hard-fails). Kill is
+  // the effector's own cumulative Pk; the product handles the soft gating.
+  const p_reach = clamp(reach.reach_probability, 0, 1)
+  const p_kill = effectorKillProbability(s.effector)
 
   const p_negate = clamp(
     p_detect * p_classify * p_decision * p_reach * p_kill,
