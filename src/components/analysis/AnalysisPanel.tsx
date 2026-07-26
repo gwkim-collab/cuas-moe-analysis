@@ -26,6 +26,8 @@ function NumField({
   paramKey,
   onExplain,
   onChange,
+  active,
+  dim,
 }: {
   label: string
   unit?: string
@@ -34,13 +36,18 @@ function NumField({
   paramKey: string
   onExplain?: (key: string) => void
   onChange: (v: number) => void
+  /** Mark as the currently-selected option (accent + 활성 badge). */
+  active?: boolean
+  /** Mark as an independent-but-inactive option (dimmed). */
+  dim?: boolean
 }) {
   const hint = hintFor(paramKey)
   return (
-    <label className="an-field" title={hint}>
+    <label className={`an-field ${active ? 'is-active-opt' : ''} ${dim ? 'is-dim-opt' : ''}`} title={hint}>
       <span className="an-field-label">
         {label}
         {unit ? <em className="an-field-unit"> · {unit}</em> : null}
+        {active ? <span className="an-opt-badge">활성</span> : null}
         {onExplain ? (
           <button
             type="button"
@@ -171,8 +178,11 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <NumField label="순항 속도" unit="m/s" value={e.cruise_speed_m_s} paramKey="effector.cruise_speed_m_s" onExplain={onExplain} onChange={(v) => setEffector({ cruise_speed_m_s: v })} />
         <NumField label="최대 교전거리" unit="m" value={e.max_engagement_range_m} paramKey="effector.max_engagement_range_m" onExplain={onExplain} onChange={(v) => setEffector({ max_engagement_range_m: v })} />
         <NumField label="발사대 거리" unit="m" value={e.launch_pad_range_from_asset_m} paramKey="effector.launch_pad_range_from_asset_m" onExplain={onExplain} onChange={(v) => setEffector({ launch_pad_range_from_asset_m: v })} />
-        <NumField label="단발 Pk · net" value={e.single_shot_pk_net} step={0.01} paramKey="effector.single_shot_pk_net" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_net: v })} />
-        <NumField label="단발 Pk · shotgun" value={e.single_shot_pk_shotgun} step={0.01} paramKey="effector.single_shot_pk_shotgun" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_shotgun: v })} />
+        <NumField label="단발 Pk · net" value={e.single_shot_pk_net} step={0.01} paramKey="effector.single_shot_pk_net" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_net: v })} active={e.payload === 'net_gun'} dim={e.payload !== 'net_gun'} />
+        <NumField label="단발 Pk · shotgun" value={e.single_shot_pk_shotgun} step={0.01} paramKey="effector.single_shot_pk_shotgun" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_shotgun: v })} active={e.payload === 'shotgun'} dim={e.payload !== 'shotgun'} />
+        <p className="an-field-note ab-small" style={{ opacity: 0.7 }}>
+          넷건·샷건 Pk는 독립 입력값입니다. 위 <b>페이로드</b>가 선택한 쪽(활성)만 P_kill에 사용됩니다.
+        </p>
         <NumField label="사격 기회 수" value={e.shot_opportunities} step={1} paramKey="effector.shot_opportunities" onExplain={onExplain} onChange={(v) => setEffector({ shot_opportunities: v })} />
         <NumField label="체공 시간" unit="s" value={e.endurance_s} step={30} paramKey="effector.endurance_s" onExplain={onExplain} onChange={(v) => setEffector({ endurance_s: v })} />
         <NumField label="여유 σ" unit="m" value={e.reach_margin_sigma_m} step={10} paramKey="effector.reach_margin_sigma_m" onExplain={onExplain} onChange={(v) => setEffector({ reach_margin_sigma_m: v })} />
