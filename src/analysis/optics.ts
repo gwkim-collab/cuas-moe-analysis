@@ -46,10 +46,26 @@ export function johnsonProb(n: number): number {
   return nE / (1 + nE)
 }
 
-/** Recognition probability for a target of `size_m` at `range_m`. */
+/** N50 (px) for the currently required discrimination level. */
+export function activeN50(o: OpticalSensorSpec): number {
+  switch (o.required_discrimination) {
+    case 'detection':
+      return o.n50_detection
+    case 'identification':
+      return o.n50_identification
+    default:
+      return o.n50_recognition
+  }
+}
+
+/**
+ * Task probability at `range_m` for the REQUIRED discrimination level (its
+ * own Johnson N50). Named recognitionProb for continuity, but it honours
+ * required_discrimination (detection / recognition / identification).
+ */
 export function recognitionProb(o: OpticalSensorSpec, size_m: number, range_m: number): number {
   const N = pixelsOnTarget(o, size_m, range_m)
-  return clamp(johnsonProb(N / o.n50_recognition), 0, 1)
+  return clamp(johnsonProb(N / activeN50(o)), 0, 1)
 }
 
 /**
@@ -69,7 +85,7 @@ export function recognitionRangeForProb(o: OpticalSensorSpec, size_m: number, pr
     else hi = mid
   }
   const n = (lo + hi) / 2
-  const N = n * o.n50_recognition
+  const N = n * activeN50(o)
   if (N <= 0) return Infinity
   // N = size / (range · IFOV) → range = size / (N · IFOV)
   return size_m / (N * ifovRad(o))

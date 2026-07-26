@@ -19,6 +19,7 @@ import { paramExplain } from './paramExplain'
 // import stays position-stable.
 const HEADER = ['구분', '파라미터', 'key', '값', '단위', '의미', '값 출처', '수식', '이론 근거', '모델 가정']
 const PAYLOAD_KEY = 'effector.payload'
+const DISC_KEY = 'optics.required_discrimination'
 
 // Flatten multi-line formula/theory to a single cell (Excel-friendly).
 function flat(s?: string): string {
@@ -113,6 +114,19 @@ export function scenarioToCsv(scenario: Scenario): string {
       '', '', '',
     ]),
   )
+  // required discrimination level (enum) as a text row so it round-trips.
+  lines.push(
+    toRow([
+      'EO/IR',
+      '요구 판별 수준',
+      DISC_KEY,
+      scenario.optics.required_discrimination,
+      '',
+      "교전 승인 요구 판별 수준('detection'/'recognition'/'identification'). 해당 N50이 P_classify에 사용.",
+      '운용 설정값',
+      '', '', '',
+    ]),
+  )
   return lines.join('\r\n')
 }
 
@@ -158,6 +172,14 @@ export function applyCsv(base: Scenario, text: string): CsvImportResult {
     if (key === PAYLOAD_KEY) {
       if (rawVal === 'net_gun' || rawVal === 'shotgun') {
         scenario = { ...scenario, effector: { ...scenario.effector, payload: rawVal } }
+        applied++
+      }
+      continue
+    }
+
+    if (key === DISC_KEY) {
+      if (rawVal === 'detection' || rawVal === 'recognition' || rawVal === 'identification') {
+        scenario = { ...scenario, optics: { ...scenario.optics, required_discrimination: rawVal } }
         applied++
       }
       continue

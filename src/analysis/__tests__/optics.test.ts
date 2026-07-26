@@ -87,6 +87,24 @@ describe('acquisition (gimbal-less FOV coverage)', () => {
   })
 })
 
+describe('Johnson discrimination levels (per-level N50)', () => {
+  it('a harder required level (higher N50) lowers task probability at the same range', () => {
+    const size = 0.35
+    const range = 1500
+    const det = recognitionProb({ ...O, required_discrimination: 'detection' }, size, range)
+    const rec = recognitionProb({ ...O, required_discrimination: 'recognition' }, size, range)
+    const id = recognitionProb({ ...O, required_discrimination: 'identification' }, size, range)
+    expect(det).toBeGreaterThan(rec)
+    expect(rec).toBeGreaterThan(id)
+  })
+
+  it('identification requires closer range for 50% than recognition', () => {
+    const rRec = recognitionRangeForProb({ ...O, required_discrimination: 'recognition' }, 0.35, 0.5)
+    const rId = recognitionRangeForProb({ ...O, required_discrimination: 'identification' }, 0.35, 0.5)
+    expect(rId).toBeLessThan(rRec)
+  })
+})
+
 describe('atmospheric transmission (Koschmieder / Beer-Lambert)', () => {
   it('→ 1 at zero range, decreases with range', () => {
     expect(atmosphericTransmission(O, 0)).toBeCloseTo(1, 6)

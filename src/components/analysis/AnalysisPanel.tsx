@@ -1,4 +1,4 @@
-import { focalLengthMm, paramInfo, type Scenario } from '../../analysis'
+import { focalLengthMm, paramInfo, type Scenario, type DiscriminationLevel } from '../../analysis'
 import type { PayloadMode } from '../../types'
 import ScenarioBar from './ScenarioBar'
 
@@ -130,7 +130,20 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <NumField label="화각 HFOV" unit="°" value={o.hfov_deg} step={0.1} paramKey="optics.hfov_deg" onExplain={onExplain} onChange={(v) => setOptics({ hfov_deg: v })} />
         <NumField label="가로 해상도" unit="px" value={o.h_resolution_px} step={10} paramKey="optics.h_resolution_px" onExplain={onExplain} onChange={(v) => setOptics({ h_resolution_px: v })} />
         <NumField label="센서 폭" unit="mm" value={o.sensor_width_mm} step={0.1} paramKey="optics.sensor_width_mm" onExplain={onExplain} onChange={(v) => setOptics({ sensor_width_mm: v })} />
-        <NumField label="인식 요구픽셀 N50" unit="px" value={o.n50_recognition} step={1} paramKey="optics.n50_recognition" onExplain={onExplain} onChange={(v) => setOptics({ n50_recognition: v })} />
+        <label className="an-field" title="교전 승인에 요구되는 Johnson 판별 수준 — 이 수준의 N50이 P_classify에 쓰임">
+          <span className="an-field-label">요구 판별 수준</span>
+          <select
+            value={o.required_discrimination}
+            onChange={(ev) => setOptics({ required_discrimination: ev.target.value as DiscriminationLevel })}
+          >
+            <option value="detection">탐지 (있다)</option>
+            <option value="recognition">인식 (드론/위협)</option>
+            <option value="identification">식별 (기종)</option>
+          </select>
+        </label>
+        <NumField label="탐지 N50" unit="px" value={o.n50_detection} step={0.5} paramKey="optics.n50_detection" onExplain={onExplain} onChange={(v) => setOptics({ n50_detection: v })} />
+        <NumField label="인식 N50" unit="px" value={o.n50_recognition} step={1} paramKey="optics.n50_recognition" onExplain={onExplain} onChange={(v) => setOptics({ n50_recognition: v })} />
+        <NumField label="식별 N50" unit="px" value={o.n50_identification} step={1} paramKey="optics.n50_identification" onExplain={onExplain} onChange={(v) => setOptics({ n50_identification: v })} />
         <NumField label="레이더 큐 오차" unit="°" value={o.cue_error_deg} step={0.1} paramKey="optics.cue_error_deg" onExplain={onExplain} onChange={(v) => setOptics({ cue_error_deg: v })} />
         <NumField label="요격기 지향 오차" unit="°" value={o.pointing_error_deg} step={0.1} paramKey="optics.pointing_error_deg" onExplain={onExplain} onChange={(v) => setOptics({ pointing_error_deg: v })} />
         <NumField label="대기 시정" unit="km" value={o.visibility_km} step={0.5} paramKey="optics.visibility_km" onExplain={onExplain} onChange={(v) => setOptics({ visibility_km: v })} />

@@ -21,6 +21,8 @@ import {
 
 interface DiagramProps {
   scenario: Scenario
+  /** The parameter key the explainer was opened from (some diagrams specialise on it). */
+  paramKey?: string
 }
 
 // ── shared frame + helpers ────────────────────────────────────
@@ -238,9 +240,20 @@ const JohnsonN50: FC<DiagramProps> = ({ scenario }) => {
 }
 
 // ── 5) cumulative Pk vs shot count (bars) ─────────────────────
-const PkCumulative: FC<DiagramProps> = ({ scenario }) => {
+const PkCumulative: FC<DiagramProps> = ({ scenario, paramKey }) => {
   const e = scenario.effector
-  const p = singleShotPk(e)
+  // Show the curve for the specific weapon whose ⓘ was opened; for the
+  // shot-count parameter, use the active payload.
+  const p =
+    paramKey === 'effector.single_shot_pk_net'
+      ? Math.min(1, Math.max(0, e.single_shot_pk_net))
+      : paramKey === 'effector.single_shot_pk_shotgun'
+        ? Math.min(1, Math.max(0, e.single_shot_pk_shotgun))
+        : singleShotPk(e)
+  const weapon =
+    paramKey === 'effector.single_shot_pk_net' ? 'NET GUN'
+    : paramKey === 'effector.single_shot_pk_shotgun' ? 'SHOTGUN'
+    : e.payload === 'net_gun' ? 'NET GUN (활성)' : 'SHOTGUN (활성)'
   const cur = Math.max(1, Math.floor(e.shot_opportunities))
   const nMax = Math.max(6, cur + 2)
   const sy = scale(0, 1, T + PH, T)
@@ -266,7 +279,7 @@ const PkCumulative: FC<DiagramProps> = ({ scenario }) => {
           </g>
         )
       })}
-      <text x={L + PW} y={T + 12} fill={TXT} fontSize={11} textAnchor="end">단발 p = {fmt(p, 2)}</text>
+      <text x={L + PW} y={T + 12} fill={TXT} fontSize={11} textAnchor="end">{weapon} · 단발 p = {fmt(p, 2)}</text>
     </Frame>
   )
 }

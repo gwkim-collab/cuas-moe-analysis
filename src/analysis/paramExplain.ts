@@ -155,11 +155,25 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
     formula: 'HFOV = 2 · atan(sensor_w / (2 · f))',
     detail: '센서 물리 폭. 초점거리 f ↔ 화각 환산 표시용이며 인식 픽셀 계산에는 직접 쓰이지 않습니다.',
   },
+  'optics.n50_detection': {
+    theory: `${REF_JOHNSON}: 탐지급 ≈1.0 cycle. 판별수준별 N50 상이(탐지<인식<식별).`,
+    assumption: 'N50 단위 px(≈2×cycle). 요구 판별수준="탐지"일 때만 P_classify에 사용.',
+    formula: 'P = nᴱ / (1 + nᴱ),  n = N_px / N50_탐지',
+    detail: '"무언가 있다" 수준(가장 쉬움). 요구 판별수준을 탐지로 두면 원거리에서도 통과가 쉬워집니다.',
+    diagram: 'johnson-n50',
+  },
   'optics.n50_recognition': {
-    theory: `${REF_JOHNSON}: P = nᴱ/(1+nᴱ), n=N/N50, E=2.7+0.7n.`,
-    formula: 'P = nᴱ / (1 + nᴱ),  n = N_px / N50,  E = 2.7 + 0.7·n',
-    detail:
-      '"50% 인식에 필요한 픽셀 수" 문턱. N50이 클수록(어려운 과제) 같은 거리에서 인식확률이 낮아집니다. 곡선은 픽셀이 N50에 도달하는 지점에서 급격히 상승합니다.',
+    theory: `${REF_JOHNSON}: 인식급 ≈4.0 cycle. 판별수준별 N50 상이(탐지<인식<식별).`,
+    assumption: 'N50 단위 px(≈2×cycle). 요구 판별수준="인식"일 때 사용(기본).',
+    formula: 'P = nᴱ / (1 + nᴱ),  n = N_px / N50_인식,  E = 2.7 + 0.7·n',
+    detail: '"드론/위협인가" 수준. N50이 클수록 같은 거리에서 인식확률이 낮아집니다. 요구 판별수준 기본값.',
+    diagram: 'johnson-n50',
+  },
+  'optics.n50_identification': {
+    theory: `${REF_JOHNSON}: 식별급 ≈6.4 cycle. 판별수준별 N50 상이(탐지<인식<식별).`,
+    assumption: 'N50 단위 px(≈2×cycle). 요구 판별수준="식별"일 때만 P_classify에 사용.',
+    formula: 'P = nᴱ / (1 + nᴱ),  n = N_px / N50_식별',
+    detail: '"기종까지" 수준(가장 어려움). 교전 승인에 식별을 요구하면 훨씬 가까워야 통과 → P_classify·교전거리 크게 하락.',
     diagram: 'johnson-n50',
   },
   'optics.cue_error_deg': {

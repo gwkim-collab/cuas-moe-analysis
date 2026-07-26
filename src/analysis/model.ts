@@ -11,6 +11,12 @@
 
 import type { PayloadMode } from '../types'
 
+/**
+ * Johnson/NVESD discrimination task levels — each needs a different resolution
+ * (its own N50). Detection < recognition < identification in difficulty.
+ */
+export type DiscriminationLevel = 'detection' | 'recognition' | 'identification'
+
 // ── Threat (incoming hostile UAS) ─────────────────────────────
 export interface ThreatSpec {
   /** Radar cross-section (m²). Small FPV ≈ 0.01 m² (−20 dBsm). SME-VERIFY */
@@ -58,8 +64,17 @@ export interface OpticalSensorSpec {
   hfov_deg: number
   /** Sensor width (mm) — used only for the focal-length ↔ FOV conversion display. */
   sensor_width_mm: number
-  /** Pixels across the target for 50% recognition (Johnson N50). SME-VERIFY */
+  /**
+   * Johnson N50 (pixels on target for 50% task probability) per discrimination
+   * level. Johnson's criteria give these in CYCLES across the min dimension
+   * (detection ≈1.0, recognition ≈4.0, identification ≈6.4); here they are in
+   * PIXELS (≈ 2× cycles). Detection < recognition < identification. SME-VERIFY
+   */
+  n50_detection: number
   n50_recognition: number
+  n50_identification: number
+  /** Which discrimination level the classify stage requires to declare hostile. */
+  required_discrimination: DiscriminationLevel
   /**
    * Radar-cue angular error, 1σ (deg). This is a GIMBAL-LESS system: the
    * camera is coarse-pointed by the radar cue, so cue bearing error is one
@@ -165,7 +180,12 @@ export const DEFAULT_OPTICS: OpticalSensorSpec = {
   h_resolution_px: 1920,
   hfov_deg: 1.5, // narrow EO for recognition at range (NO gimbal — see cue/pointing error)
   sensor_width_mm: 6.4,
+  // px ≈ 2× Johnson cycles (detection 1.0 / recognition 4.0 / identification 6.4).
+  // recognition kept at 6 px for baseline continuity — SME-VERIFY the cycle basis.
+  n50_detection: 1.5,
   n50_recognition: 6,
+  n50_identification: 10,
+  required_discrimination: 'recognition',
   // NOTE: a gimbal-less recognition-at-range concept only closes if the TOTAL
   // pointing error stays sub-degree (√(cue²+point²) ≲ 0.5°); larger errors make
   // P_acq collapse for any FOV narrow enough to recognise the target. These are

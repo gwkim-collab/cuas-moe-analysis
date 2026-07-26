@@ -147,10 +147,22 @@ export const PARAM_INFO: ParamInfo[] = [
     get: (s) => s.optics.sensor_width_mm, set: S('optics', 'sensor_width_mm'),
   },
   {
-    key: 'optics.n50_recognition', section: 'EO/IR', label: '인식 요구픽셀 N50', unit: 'px',
-    description: '50% 인식에 필요한 표적 픽셀 수(난이도 문턱). Johnson 확률 P=f(N/N50). ↑값=난이도↑=성능↓.',
-    source: `참고: NVESD 표적획득 N50 통상범위 · ${PLACEHOLDER}`,
+    key: 'optics.n50_detection', section: 'EO/IR', label: '탐지 N50', unit: 'px',
+    description: 'Johnson 탐지급 문턱(≈1.0 cycle). "무언가 있다" 판별. 요구 판별수준=탐지일 때 사용.',
+    source: `참고: Johnson 탐지 ≈1.0cyc · ${PLACEHOLDER}`,
+    get: (s) => s.optics.n50_detection, set: S('optics', 'n50_detection'), sweep: { min: 1, max: 8 },
+  },
+  {
+    key: 'optics.n50_recognition', section: 'EO/IR', label: '인식 N50', unit: 'px',
+    description: 'Johnson 인식급 문턱(≈4.0 cycle). "드론/위협인가" 판별. 요구 판별수준=인식일 때 사용.',
+    source: `참고: Johnson 인식 ≈4.0cyc · ${PLACEHOLDER}`,
     get: (s) => s.optics.n50_recognition, set: S('optics', 'n50_recognition'), sweep: { min: 2, max: 20 },
+  },
+  {
+    key: 'optics.n50_identification', section: 'EO/IR', label: '식별 N50', unit: 'px',
+    description: 'Johnson 식별급 문턱(≈6.4 cycle). "기종까지" 판별. 요구 판별수준=식별일 때 사용.',
+    source: `참고: Johnson 식별 ≈6.4cyc · ${PLACEHOLDER}`,
+    get: (s) => s.optics.n50_identification, set: S('optics', 'n50_identification'), sweep: { min: 4, max: 30 },
   },
   {
     key: 'optics.cue_error_deg', section: 'EO/IR', label: '레이더 큐 오차', unit: '°',

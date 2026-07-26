@@ -60,7 +60,7 @@ export default function ParamExplainModal({ paramKey, scenario, onClose }: Props
 
           {Diagram ? (
             <div className="an-modal-diagram">
-              <Diagram scenario={scenario} />
+              <Diagram scenario={scenario} paramKey={paramKey} />
               <div className="ab-small an-modal-diagram-note">
                 현재 시나리오 값으로 그린 실제 모델 곡선입니다. 파라미터를 바꾸면 곡선도 바뀝니다.
               </div>
