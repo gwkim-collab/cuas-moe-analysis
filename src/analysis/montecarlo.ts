@@ -59,6 +59,16 @@ export interface McUncertainty {
   pointing_error_sd_deg: number
   /** Coefficient of variation on atmospheric visibility (multiplicative). */
   visibility_cv: number
+  /** Std-dev (m) added to threat altitude (→ slant range). */
+  altitude_sd_m: number
+  /** Coefficient of variation on the target characteristic size (which airframe). */
+  size_cv: number
+  /** Std-dev (deg) added to the radar cue error. */
+  cue_error_sd_deg: number
+  /** Coefficient of variation on interceptor cruise speed. */
+  cruise_speed_cv: number
+  /** Std-dev (count) on shot opportunities (engagement-window jitter, rounded). */
+  shot_opportunities_sd: number
   /** Randomise the approach bearing uniformly over 0..360°. */
   bearing_uniform: boolean
 }
@@ -71,6 +81,11 @@ export const DEFAULT_UNCERTAINTY: McUncertainty = {
   launch_delay_sd_s: 1,
   pointing_error_sd_deg: 0.15,
   visibility_cv: 0.25,
+  altitude_sd_m: 40, // 위협 고도 변동 → 경사거리 — SME-VERIFY
+  size_cv: 0.2, // 기종 다양성(임계치수) — SME-VERIFY
+  cue_error_sd_deg: 0.1, // 레이더 큐 지터 — SME-VERIFY
+  cruise_speed_cv: 0.05, // 요격기 속도 변동(비교적 일정) — SME-VERIFY
+  shot_opportunities_sd: 0.7, // 교전창 사격 기회 변동 — SME-VERIFY
   bearing_uniform: true,
 }
 
@@ -115,6 +130,11 @@ function sampleScenario(base: Scenario, u: McUncertainty, rng: Rng): Scenario {
 
   const pointing = Math.max(0, base.optics.pointing_error_deg + u.pointing_error_sd_deg * normal(rng))
   const visibility = Math.max(0.05, base.optics.visibility_km * (1 + u.visibility_cv * normal(rng)))
+  const altitude = Math.max(0, base.threat.altitude_m_agl + u.altitude_sd_m * normal(rng))
+  const size = Math.max(0.01, base.threat.characteristic_size_m * (1 + u.size_cv * normal(rng)))
+  const cue = Math.max(0, base.optics.cue_error_deg + u.cue_error_sd_deg * normal(rng))
+  const cruise = Math.max(1, base.effector.cruise_speed_m_s * (1 + u.cruise_speed_cv * normal(rng)))
+  const shots = Math.max(0, Math.round(base.effector.shot_opportunities + u.shot_opportunities_sd * normal(rng)))
 
   return {
     ...base,
@@ -123,11 +143,14 @@ function sampleScenario(base: Scenario, u: McUncertainty, rng: Rng): Scenario {
       speed_m_s: speed,
       rcs_m2: rcs,
       approach_bearing_deg: bearing,
+      altitude_m_agl: altitude,
+      characteristic_size_m: size,
     },
     optics: {
       ...base.optics,
       pointing_error_deg: pointing,
       visibility_km: visibility,
+      cue_error_deg: cue,
     },
     sensor: {
       ...base.sensor,
@@ -140,6 +163,8 @@ function sampleScenario(base: Scenario, u: McUncertainty, rng: Rng): Scenario {
     effector: {
       ...base.effector,
       launch_delay_s: Math.max(0, base.effector.launch_delay_s + u.launch_delay_sd_s * normal(rng)),
+      cruise_speed_m_s: cruise,
+      shot_opportunities: shots,
     },
   }
 }
