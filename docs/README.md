@@ -1,7 +1,8 @@
 # AIRLOCK 효과도(MOE)·시스템 분석 도구 — 문서 허브
 
 C-UAS 요격 체계(AB-U10)의 효과도와 시스템 트레이드오프를 분석하고, **요구사항을 도출**하는 도구.
-`components/c2`의 `feat/effectiveness-analysis` 브랜치에 구축(전부 로컬 커밋).
+이 저장소(airlock-c2)의 `feat/effectiveness-analysis` 브랜치에 구축. (경로는 모두 **저장소 루트** 기준.
+AIRLOCK 워크스페이스에서는 이 저장소가 `components/c2/`에 위치)
 
 ## 📄 문서
 
@@ -10,10 +11,11 @@ C-UAS 요격 체계(AB-U10)의 효과도와 시스템 트레이드오프를 분�
 | **[MOE_분석도구_매뉴얼.md](./MOE_분석도구_매뉴얼.md)** | 사용법·화면·킬체인 모델(물리 5층+근거)·파라미터·CSV/리포트·몬테카를로 설계·한계. 요구사항 도출 예시(탐지거리·EO 스펙) 포함 |
 | **[MOE_스터디_결과.md](./MOE_스터디_결과.md)** | 분석 결과(findings): 표적크기 민감도 · 짐벌 없는 대안 · 위협 케이스별 효과도 |
 
-## ▶ 실행
-- `components/c2/run.cmd` 더블클릭(의존성 자동 설치), 또는 `pnpm start`(= vite --open) → http://localhost:5174/
-- 운용 화면 "효과도 분석 ▸" 버튼 / `A` 키로 진입
-- 검증: `pnpm gen:sample` · `tsc -b` · `vitest run` (58 tests)
+## ▶ 실행 (저장소 루트에서)
+- **원클릭**: 루트의 `run.cmd` 더블클릭(의존성 자동 설치 후 서버+브라우저)
+- **터미널**: `pnpm install` (최초 1회) → `pnpm start` (= `vite --open`) → http://localhost:5174/
+- 운용 화면 우상단 "효과도 분석 ▸" 버튼 / `A` 키로 분석 진입
+- 검증: `pnpm gen:sample` · `pnpm exec tsc -b` · `pnpm test` (= vitest, 59 tests)
 
 ## 🔒 설계 결정 / ⏳ 미정
 - 🔒 **짐벌 미도입**(확정) — EO 기체 고정, 획득 P_acq 상시 적용. 개선 레버는 짐벌이 아님.

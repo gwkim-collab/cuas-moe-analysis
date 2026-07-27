@@ -12,10 +12,12 @@
 
 ## 1. 실행
 
-- **원클릭**: `components/c2/run.cmd` 더블클릭 → (필요 시 의존성 자동 설치) → dev 서버 + 브라우저 자동
-- **터미널**: `pnpm start` (= `vite --open`). 개발 포트 `5174` → http://localhost:5174/
+> 경로는 모두 **저장소 루트** 기준(AIRLOCK 워크스페이스에서는 이 저장소가 `components/c2/`에 위치).
+
+- **원클릭**: 루트의 `run.cmd` 더블클릭 → (필요 시 의존성 자동 설치) → dev 서버 + 브라우저 자동
+- **터미널**: (최초 1회 `pnpm install` 후) `pnpm start` (= `vite --open`). 개발 포트 `5174` → http://localhost:5174/
 - 운용 화면에서 우상단 **"효과도 분석 ▸"** 버튼 또는 키보드 **`A`** 로 진입, **`O`** 로 운용 화면 복귀
-- 검증: `pnpm gen:sample`(샘플 CSV 재생성) · `tsc -b`(타입체크) · `vitest run`(테스트)
+- 검증: `pnpm gen:sample`(샘플 CSV 재생성) · `pnpm exec tsc -b`(타입체크) · `pnpm test`(= vitest)
 
 ## 2. 화면 구성
 
