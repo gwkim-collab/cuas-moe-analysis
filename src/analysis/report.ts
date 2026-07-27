@@ -100,7 +100,7 @@ export function reportToMarkdown(report: AnalysisReport): string {
   lines.push(`| 평균 P_negate | ${pct(c.mean_p_negate)} |`)
   lines.push(`| 방어 커버리지 (≥${pct(c.threshold)}) | ${pct(c.defended_fraction)} |`)
   lines.push(`| 탐지 반경 | ${c.nominal_detection_range_m.toFixed(0)} m |`)
-  lines.push(`| 최대 교전 반경 | ${c.max_engagement_range_m.toFixed(0)} m |`)
+  lines.push(`| 요격기 도달 반경 | ${c.max_engagement_range_m.toFixed(0)} m |`)
   lines.push(`| Keep-out 반경 | ${c.keep_out_radius_m.toFixed(0)} m |`)
   lines.push('')
   lines.push('## 4. 입력 파라미터')

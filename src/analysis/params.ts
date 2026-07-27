@@ -199,8 +199,8 @@ export const PARAM_INFO: ParamInfo[] = [
     get: (s) => s.effector.cruise_speed_m_s, set: S('effector', 'cruise_speed_m_s'), sweep: { min: 15, max: 150 },
   },
   {
-    key: 'effector.max_engagement_range_m', section: '이팩터', label: '최대 교전거리', unit: 'm',
-    description: '발사대에서 요격기가 유효하게 도달 가능한 최대 거리. 교전 성립 상한.',
+    key: 'effector.max_engagement_range_m', section: '이팩터', label: '요격기 도달 반경', unit: 'm',
+    description: '발사대에서 요격 드론(AB-U10)이 날아가 도달 가능한 최대 거리(작전 반경). 요격 성립 상한. ※ 넷건 사거리(~25m)와 무관 — 그건 도달 후 종말 발사 거리(별개).',
     source: `이팩터 스펙(입력) · ${PLACEHOLDER}`,
     get: (s) => s.effector.max_engagement_range_m, set: S('effector', 'max_engagement_range_m'), sweep: { min: 500, max: 6000 },
   },
@@ -230,7 +230,7 @@ export const PARAM_INFO: ParamInfo[] = [
   },
   {
     key: 'effector.endurance_s', section: '이팩터', label: '체공 시간', unit: 's',
-    description: '요격기 체공 한계. 유효 반경을 순항속도×체공시간으로 제한(최대교전거리와 함께 min).',
+    description: '요격기 체공 한계. 유효 반경을 순항속도×체공시간으로 제한(요격기 도달 반경과 함께 min).',
     source: `이팩터 스펙(입력) · ${PLACEHOLDER}`,
     get: (s) => s.effector.endurance_s, set: S('effector', 'endurance_s'), sweep: { min: 60, max: 3600 },
   },

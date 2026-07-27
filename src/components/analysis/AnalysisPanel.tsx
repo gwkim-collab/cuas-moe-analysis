@@ -176,7 +176,7 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         </label>
         <NumField label="발사 지연" unit="s" value={e.launch_delay_s} step={0.5} paramKey="effector.launch_delay_s" onExplain={onExplain} onChange={(v) => setEffector({ launch_delay_s: v })} />
         <NumField label="순항 속도" unit="m/s" value={e.cruise_speed_m_s} paramKey="effector.cruise_speed_m_s" onExplain={onExplain} onChange={(v) => setEffector({ cruise_speed_m_s: v })} />
-        <NumField label="최대 교전거리" unit="m" value={e.max_engagement_range_m} paramKey="effector.max_engagement_range_m" onExplain={onExplain} onChange={(v) => setEffector({ max_engagement_range_m: v })} />
+        <NumField label="요격기 도달 반경" unit="m" value={e.max_engagement_range_m} paramKey="effector.max_engagement_range_m" onExplain={onExplain} onChange={(v) => setEffector({ max_engagement_range_m: v })} />
         <NumField label="발사대 거리" unit="m" value={e.launch_pad_range_from_asset_m} paramKey="effector.launch_pad_range_from_asset_m" onExplain={onExplain} onChange={(v) => setEffector({ launch_pad_range_from_asset_m: v })} />
         <NumField label="단발 Pk · net" value={e.single_shot_pk_net} step={0.01} paramKey="effector.single_shot_pk_net" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_net: v })} active={e.payload === 'net_gun'} dim={e.payload !== 'net_gun'} />
         <NumField label="단발 Pk · shotgun" value={e.single_shot_pk_shotgun} step={0.01} paramKey="effector.single_shot_pk_shotgun" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_shotgun: v })} active={e.payload === 'shotgun'} dim={e.payload !== 'shotgun'} />

@@ -313,7 +313,7 @@ const ClosingGeometry: FC<DiagramProps> = ({ scenario }) => {
       <rect x={sx(keepOut)} y={T} width={Math.max(0, sx(0) - sx(keepOut))} height={PH} fill="rgba(255,107,107,0.10)" />
       {tick(keepOut, `keep-out ${fmt(keepOut)}`, WARN, false)}
       {/* max reach */}
-      {tick(maxReach, `최대교전 ${fmt(maxReach)}`, TXT_DIM, true)}
+      {tick(maxReach, `도달반경 ${fmt(maxReach)}`, TXT_DIM, true)}
       {rPad > 0 && tick(rPad, `발사대 ${fmt(rPad)}`, TXT_DIM, false)}
       {tick(det.detect_at_range_m, `탐지 ${fmt(det.detect_at_range_m)}`, TXT, true)}
       {/* threat inbound arrow */}

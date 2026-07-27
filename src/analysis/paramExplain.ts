@@ -214,9 +214,10 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
     diagram: 'closing-geometry',
   },
   'effector.max_engagement_range_m': {
-    theory: `${REF_KINE}: 교전 성립 상한 제약.`,
-    formula: '교전 성립 ⟺ keep-out < R_int ≤ 최대교전거리',
-    detail: '발사대에서 요격기가 유효 도달 가능한 최대 거리. 요격 지점이 이보다 멀면 교전 불성립.',
+    theory: `${REF_KINE}: 요격 드론 도달 반경 = 요격 성립 상한.`,
+    assumption: '요격기(드론) 작전 반경. 넷건 사거리(~25m, 종말 발사 거리)와 별개 — 종말 근접·발사는 P_kill에 암묵 포함.',
+    formula: '요격 성립 ⟺ keep-out < R_int ≤ 도달 반경',
+    detail: '발사대에서 요격 드론(AB-U10)이 날아가 표적을 만날 수 있는 최대 거리(작전 반경). 요격 지점이 이보다 멀면 도달 불가. ⚠ 넷건 사거리(~25m)와 혼동 금지 — 그건 도달 후 표적에 바짝 붙어 넷을 쏘는 종말 거리이며 현재 P_kill에 뭉뚱그려져 있음.',
     diagram: 'closing-geometry',
   },
   'effector.launch_pad_range_from_asset_m': {
@@ -248,9 +249,9 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
   },
   'effector.endurance_s': {
     theory: '유효 반경은 물리 도달거리와 스펙 최대치 중 작은 값.',
-    formula: '유효 반경 = min(최대교전거리, v_i · 체공시간)',
+    formula: '유효 반경 = min(요격기 도달 반경, v_i · 체공시간)',
     detail:
-      '체공이 짧으면 순항속도로 갈 수 있는 거리가 최대교전거리보다 작아져 먼 요격이 불가능해집니다. 기본값에선 v_i·체공 ≫ 최대교전거리라 구속되지 않습니다.',
+      '체공이 짧으면 순항속도로 갈 수 있는 거리가 도달 반경보다 작아져 먼 요격이 불가능해집니다. 기본값에선 v_i·체공 ≫ 도달 반경이라 구속되지 않습니다.',
     diagram: 'closing-geometry',
   },
   'effector.reach_margin_sigma_m': {

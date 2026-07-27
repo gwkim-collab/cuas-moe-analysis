@@ -41,7 +41,7 @@ export default function CoverageView({ scenario }: Props) {
         </div>
         <div className="an-cov-legend">
           <span><i className="an-dot" style={{ background: '#ff3d55' }} /> keep-out {coverage.keep_out_radius_m.toFixed(0)}m</span>
-          <span><i className="an-dot" style={{ background: '#ffb020' }} /> 최대교전 {coverage.max_engagement_range_m.toFixed(0)}m</span>
+          <span><i className="an-dot" style={{ background: '#ffb020' }} /> 도달반경 {coverage.max_engagement_range_m.toFixed(0)}m</span>
           <span><i className="an-dot" style={{ background: '#5fb6ff' }} /> 탐지 {coverage.nominal_detection_range_m.toFixed(0)}m</span>
           <span><i className="an-dot" style={{ background: '#00FFBC' }} /> 방어 footprint</span>
         </div>
