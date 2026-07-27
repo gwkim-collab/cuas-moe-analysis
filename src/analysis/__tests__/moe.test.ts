@@ -146,6 +146,19 @@ describe('computeMoe composition', () => {
     expect(d.subFactor?.label).toContain('대기 투과')
   })
 
+  it('decision-recognition coupling: 0 = independent, >0 lowers P_decision when recognition is poor', () => {
+    const indep = scn(); indep.c2.decision_recognition_coupling = 0
+    expect(computeMoe(indep).breakdown.p_decision).toBeCloseTo(indep.c2.decision_reliability, 9)
+
+    // full coupling + poor recognition (tiny target) → P_decision drops below reliability
+    const coupled = scn()
+    coupled.c2.decision_recognition_coupling = 1
+    coupled.threat.characteristic_size_m = 0.15
+    const r = computeMoe(coupled)
+    expect(r.breakdown.p_decision).toBeLessThan(coupled.c2.decision_reliability)
+    expect(r.breakdown.p_decision).toBeCloseTo(coupled.c2.decision_reliability * r.optics.recognition_prob, 6)
+  })
+
   it('p_negate never exceeds any single gate probability', () => {
     const r = computeMoe(scn())
     const { p_detect, p_classify, p_decision, p_reach, p_kill } = r.breakdown

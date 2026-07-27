@@ -269,6 +269,12 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
     detail: 'CONFIRM→APPROVE 운용자 결심 시간. 교전 성립 여부에 특히 민감합니다.',
     diagram: 'closing-geometry',
   },
+  'c2.decision_recognition_coupling': {
+    theory: '인간 결심은 분류 신뢰도(이미지 명료도)에 의존 — 애매하면 오판·주저.',
+    assumption: '선형 커플링. 인식은 이미 P_classify를 게이팅 → >0은 부분 이중계산(인간 판단 추가 민감도로 해석). 0=독립(종전).',
+    formula: 'P_decision = 결심신뢰도 × (1 − 커플링 · (1 − 인식))',
+    detail: '커플링=0이면 결심과 인식이 독립. 1이면 인식이 낮을 때 결심 신뢰도도 함께 떨어짐. 기본 0.5(중간 가정).',
+  },
   'c2.decision_reliability': {
     theory: `${REF_SERIES}: 킬체인은 단계 확률의 곱.`,
     assumption: '단계 독립.',

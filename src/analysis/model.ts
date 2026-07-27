@@ -134,6 +134,16 @@ export interface C2Spec {
   decision_latency_s: number
   /** Probability the operator correctly approves engagement in the window (0..1). SME-VERIFY */
   decision_reliability: number
+  /**
+   * 0..1 — how much poor EO recognition degrades the operator decision:
+   *   P_decision = reliability × (1 − coupling·(1 − recognition)).
+   * 0 = independent (P_decision = reliability, previous behaviour);
+   * 1 = fully coupled (decision no better than the image confidence).
+   * ⚠ recognition already gates P_classify, so coupling>0 adds a second,
+   * partly-correlated penalty — read it as the *extra human-judgment*
+   * sensitivity to a marginal image. SME-VERIFY.
+   */
+  decision_recognition_coupling: number
 }
 
 // ── Site (protected asset + engagement constraints) ───────────
@@ -211,6 +221,7 @@ export const DEFAULT_EFFECTOR: EffectorSpec = {
 export const DEFAULT_C2: C2Spec = {
   decision_latency_s: 10,
   decision_reliability: 0.98,
+  decision_recognition_coupling: 0.5, // moderate coupling — SME-VERIFY (0 = independent)
 }
 
 export const DEFAULT_SITE: SiteSpec = {

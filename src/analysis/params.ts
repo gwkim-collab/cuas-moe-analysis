@@ -254,6 +254,12 @@ export const PARAM_INFO: ParamInfo[] = [
     source: `${PLACEHOLDER}`,
     get: (s) => s.c2.decision_reliability, set: S('c2', 'decision_reliability'), sweep: { min: 0, max: 1 },
   },
+  {
+    key: 'c2.decision_recognition_coupling', section: 'C2', label: '결심-인식 커플링',
+    description: '인식이 애매할수록 결심 신뢰도를 깎는 정도(0=독립, 1=완전 연동). P_decision=신뢰도×(1−커플링·(1−인식)).',
+    source: `가정(모델 파라미터) · 편집 가능`,
+    get: (s) => s.c2.decision_recognition_coupling, set: S('c2', 'decision_recognition_coupling'), sweep: { min: 0, max: 1 },
+  },
 
   // ── 사이트 ──────────────────────────────────────────────
   {

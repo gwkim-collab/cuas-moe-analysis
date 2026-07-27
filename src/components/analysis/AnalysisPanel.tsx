@@ -192,6 +192,7 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <legend>C2 · 결심</legend>
         <NumField label="결심 지연" unit="s" value={c.decision_latency_s} step={0.5} paramKey="c2.decision_latency_s" onExplain={onExplain} onChange={(v) => setC2({ decision_latency_s: v })} />
         <NumField label="결심 신뢰도" value={c.decision_reliability} step={0.01} paramKey="c2.decision_reliability" onExplain={onExplain} onChange={(v) => setC2({ decision_reliability: v })} />
+        <NumField label="결심-인식 커플링" value={c.decision_recognition_coupling} step={0.1} paramKey="c2.decision_recognition_coupling" onExplain={onExplain} onChange={(v) => setC2({ decision_recognition_coupling: v })} />
       </fieldset>
 
       <fieldset className="an-group">

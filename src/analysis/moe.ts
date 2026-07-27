@@ -113,7 +113,15 @@ export function computeMoe(s: Scenario): MoeResult {
     0,
     1,
   )
-  const p_decision = clamp(s.c2.decision_reliability, 0, 1)
+  // Operator decision, optionally coupled to EO recognition confidence: a
+  // marginal image both fails the classifier (P_classify) AND makes the human
+  // approval less reliable. coupling=0 recovers the independent gate.
+  const decision_coupling = clamp(s.c2.decision_recognition_coupling, 0, 1)
+  const p_decision = clamp(
+    s.c2.decision_reliability * (1 - decision_coupling * (1 - recognition_prob)),
+    0,
+    1,
+  )
   // Continuous reach (softened by margin σ, 0 if geometry hard-fails). Kill is
   // the effector's own cumulative Pk; the product handles the soft gating.
   const p_reach = clamp(reach.reach_probability, 0, 1)
