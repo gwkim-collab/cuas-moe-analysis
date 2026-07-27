@@ -41,8 +41,10 @@ const S =
 
 // Value provenance marker: this number is NOT measured/verified. The MODEL
 // basis (theory·assumption) lives in paramExplain.ts; this field is only the
-// value's source. Unmeasured values say "입력 필요" — never a guess dressed up.
-const PLACEHOLDER = '값 입력 필요 · 측정/스펙 미검증(SME)'
+// value's source. For a notional (not-yet-built) system these are ASSUMPTIONS,
+// not measurements — labelled as such, editable, and replaced with real data
+// only if/when it exists. Never a guess dressed up as measured.
+const PLACEHOLDER = '가정·입력값(미확정, 편집 가능) · 실측 시 교체'
 
 export const PARAM_INFO: ParamInfo[] = [
   // ── 위협 ────────────────────────────────────────────────
@@ -86,32 +88,32 @@ export const PARAM_INFO: ParamInfo[] = [
   // ── 레이더 ──────────────────────────────────────────────
   {
     key: 'sensor.ref_rcs_m2', section: '레이더', label: '기준 RCS', unit: 'm²',
-    description: '기준 탐지거리가 정의되는 기준 표적 RCS. R∝(RCS/기준RCS)^¼ 스케일 기준점.',
-    source: `${PLACEHOLDER}`,
+    description: '레이더 정의값 ①. "이 RCS를 아래 기준 탐지거리에서 탐지"라는 한 쌍이 레이더를 규정. 임의 RCS는 R∝RCS^¼로 환산.',
+    source: `레이더 정의(가정): RCS·거리 한 쌍으로 규정 — 가상 체계, 실측 불필요`,
     get: (s) => s.sensor.ref_rcs_m2, set: S('sensor', 'ref_rcs_m2'),
   },
   {
     key: 'sensor.ref_detection_range_m', section: '레이더', label: '기준 탐지거리', unit: 'm',
-    description: '기준 RCS 표적의 탐지거리. 여기서 임의 RCS의 탐지거리를 4제곱근으로 환산.',
-    source: `센서 스펙(입력) · ${PLACEHOLDER}`,
+    description: '레이더 정의값 ②. 기준 RCS 표적을 이 거리에서 탐지. 이 한 쌍(기준 RCS·거리)만으로 레이더 탐지 성능이 정해짐.',
+    source: `레이더 정의(가정): "RCS X를 Y km에서 탐지" — 이 값만 정하면 됨`,
     get: (s) => s.sensor.ref_detection_range_m, set: S('sensor', 'ref_detection_range_m'), sweep: { min: 500, max: 8000 },
   },
   {
     key: 'sensor.pd_max', section: '레이더', label: '최대 Pd',
-    description: '거리 충분히 가까울 때의 단일 스캔 탐지확률 상한(0..1).',
-    source: `${PLACEHOLDER}`,
+    description: '거리 충분히 가까울 때의 단일 스캔 탐지확률 상한(0..1). 곡선 형태 가정값(보통 만질 필요 없음).',
+    source: `가정: 곡선 상한(공개문헌 근사) · 편집 가능`,
     get: (s) => s.sensor.pd_max, set: S('sensor', 'pd_max'),
   },
   {
     key: 'sensor.pd_transition_width_m', section: '레이더', label: 'Pd 전이 폭', unit: 'm',
-    description: '탐지거리 경계에서 Pd가 떨어지는 로지스틱 폭(클수록 완만한 경계).',
-    source: `${PLACEHOLDER}`,
+    description: '탐지거리 경계에서 Pd가 떨어지는 로지스틱 폭. 곡선 형태 가정값(보통 만질 필요 없음).',
+    source: `가정: 경계 완만도 모델값 · 편집 가능`,
     get: (s) => s.sensor.pd_transition_width_m, set: S('sensor', 'pd_transition_width_m'),
   },
   {
     key: 'sensor.revisit_time_s', section: '레이더', label: '재방문 주기', unit: 's',
-    description: '스캔 재방문 간격. 접근 트랙을 이 간격으로 샘플해 누적 Pd=1−Π(1−pd) 계산.',
-    source: `센서 스펙(입력) · ${PLACEHOLDER}`,
+    description: '스캔 재방문 간격. 접근 트랙을 이 간격으로 샘플해 누적 Pd=1−Π(1−pd) 계산. 스캔율 가정값.',
+    source: `가정: 스캔율 모델값 · 편집 가능`,
     get: (s) => s.sensor.revisit_time_s, set: S('sensor', 'revisit_time_s'),
   },
   {
