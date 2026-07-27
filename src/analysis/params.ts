@@ -81,7 +81,7 @@ export const PARAM_INFO: ParamInfo[] = [
   {
     key: 'threat.characteristic_size_m', section: '위협', label: '표적 크기', unit: 'm',
     description: '인식 가능한 임계 치수(로터/윙 스팬 등). EO/IR 표적 픽셀 수 계산의 분자.',
-    source: `참고: 소형 FPV≈0.35m · ${PLACEHOLDER}`,
+    source: `향후 결정(미정 · 대상 기종 미정) · 참고: 소형 FPV≈0.35m`,
     get: (s) => s.threat.characteristic_size_m, set: S('threat', 'characteristic_size_m'), sweep: { min: 0.05, max: 3 },
   },
 
@@ -175,7 +175,7 @@ export const PARAM_INFO: ParamInfo[] = [
   {
     key: 'optics.pointing_error_deg', section: 'EO/IR', label: '요격기 지향 오차', unit: '°',
     description: '전방 고정 카메라를 비행으로 조준할 때의 LOS 지향 오차(1σ). 큐 오차와 제곱합 √(cue²+point²)으로 P_acq = 1−exp(−(HFOV/2)²/(2σ²))를 결정.',
-    source: `추천 기본값 0.4°(sub-degree 설계목표) · 실측/스펙 입력 필요(SME)`,
+    source: `추천 기본값 0.4°(sub-degree 설계목표) · 짐벌 미도입 확정 → 큐+유도로만 확보 · 실측/스펙 입력 필요`,
     get: (s) => s.optics.pointing_error_deg, set: S('optics', 'pointing_error_deg'), sweep: { min: 0, max: 10 },
   },
   {
