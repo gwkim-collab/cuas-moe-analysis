@@ -111,7 +111,39 @@ hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
 </tr>
 </tbody></table>
 <h3>3.2 P_classify 상세 (짐벌 없는 EO 전제)</h3>
-<pre><code>P_classify = P_acq × 인식(Johnson) × 대기투과 T × 분류기 상한
+<p><strong>교전 기준(ROE)이 킬체인 구조를 바꿉니다</strong> — &quot;요구 판별 수준&quot;에 따라 EO 게이트 적용 여부가 달라짐:</p>
+<table>
+<thead>
+<tr>
+<th>교전 기준</th>
+<th>EO 게이트</th>
+<th>P_classify</th>
+<th>기본 P_negate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>탐지</strong>(레이더 단독)</td>
+<td>✗ 미적용</td>
+<td>분류기(선언) 상한</td>
+<td><strong>84.7%</strong></td>
+</tr>
+<tr>
+<td><strong>인식</strong>(EO 인식)</td>
+<td>✓ 적용 (인식 N50)</td>
+<td>P_acq×인식×대기투과×상한</td>
+<td>33.6%</td>
+</tr>
+<tr>
+<td><strong>식별</strong>(EO 식별)</td>
+<td>✓ 적용 (식별 N50)</td>
+<td>〃 (식별 N50, 더 엄격)</td>
+<td>13.7%</td>
+</tr>
+</tbody></table>
+<p>느슨한 ROE(탐지)는 실제 위협 무력화 확률이 높지만 <strong>오교전(민간·오인) 위험</strong>이 커집니다(현 모델 미반영).
+아래 P_classify 식은 <strong>인식·식별</strong> 기준일 때 적용:</p>
+<pre><code>P_classify = P_acq × 인식(Johnson) × 대기투과 T × 분류기 상한     (인식·식별 기준)
+P_classify = 분류기(선언) 상한                                    (탐지 기준 — 레이더 단독)
 </code></pre>
 <ul>
 <li><strong>획득 P_acq</strong> — 짐벌이 없어 표적이 고정 FOV에 들어와야 함. 원형 가우시안 지향오차 → Rayleigh:
@@ -488,8 +520,13 @@ RCS가 다르면 R∝RCS^¼로 환산(RCS 16배 → 필요 거리 2배).</p>
 체감이 거의 없습니다. 큰 값(1000·2000m)으로 바꾸면 탐지 시점(detect_at)이 안쪽으로 이동 → 분류 거리→인식 경로로
 소폭(+1%p)만 나타납니다. 탐지가 아슬아슬한 설계에서만 크게 작동.</p>
 <p><strong>Q3. 식별 N50(또는 탐지 N50)을 바꿔도 무변한다?</strong>
-Johnson N50 3개(탐지/인식/식별) 중 <strong>&quot;요구 판별 수준&quot;에 해당하는 하나만</strong> P_classify에 쓰입니다. 기본은 <strong>인식</strong>이라
-인식 N50만 활성. 식별 N50을 반영하려면 EO/IR의 &quot;요구 판별 수준&quot;을 <strong>식별</strong>로 바꾸세요.</p>
+&quot;요구 판별 수준(교전 기준)&quot;에 따라 다릅니다. <strong>인식/식별</strong> 기준일 때 해당 N50만 P_classify에 쓰입니다(기본은 인식 →
+인식 N50만 활성). 식별 N50을 반영하려면 교전 기준을 <strong>식별</strong>로 바꾸세요. ⚠ <strong>탐지 N50</strong>은 &quot;탐지&quot; 교전 기준이
+**레이더 단독(EO 미적용)**이라 지금은 결과에 안 쓰입니다(표시용). — Q7 참조.</p>
+<p><strong>Q7. 교전 기준(요구 판별 수준)이 결과를 크게 바꾼다?</strong>
+네. 이건 킬체인 <strong>구조</strong>를 바꿉니다. <strong>탐지</strong>(레이더 단독)는 EO 게이트를 아예 빼서 P_negate가 높지만(예 84.7%)
+오교전 위험↑. <strong>인식</strong>(33.6%)·<strong>식별</strong>(13.7%)은 EO 게이트를 적용(식별이 더 엄격). 느슨할수록 무력화율↑·안전성↓의
+트레이드오프이며, 오교전(민간 오인) 위험은 현 모델에 미반영입니다.</p>
 <p><strong>Q4. &quot;요격기 도달 반경&quot;이 넷건 사거리인가?</strong>
 아닙니다. <strong>요격기 도달 반경</strong>(기본 2500m)은 요격 드론(AB-U10)이 발사대에서 날아가 도달하는 <strong>작전 반경</strong>입니다.
 **넷건 사거리(~25m)**는 도달 후 표적에 붙어 넷을 쏘는 <strong>종말 발사 거리</strong>(별개, 현재 P_kill에 암묵 포함).</p>

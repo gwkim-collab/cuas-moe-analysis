@@ -137,8 +137,8 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <NumField label="화각 HFOV" unit="°" value={o.hfov_deg} step={0.1} paramKey="optics.hfov_deg" onExplain={onExplain} onChange={(v) => setOptics({ hfov_deg: v })} />
         <NumField label="가로 해상도" unit="px" value={o.h_resolution_px} step={10} paramKey="optics.h_resolution_px" onExplain={onExplain} onChange={(v) => setOptics({ h_resolution_px: v })} />
         <NumField label="센서 폭" unit="mm" value={o.sensor_width_mm} step={0.1} paramKey="optics.sensor_width_mm" onExplain={onExplain} onChange={(v) => setOptics({ sensor_width_mm: v })} />
-        <label className="an-field" title="교전 승인에 요구되는 Johnson 판별 수준 — 이 수준의 N50이 P_classify에 쓰임">
-          <span className="an-field-label">요구 판별 수준</span>
+        <label className="an-field" title="교전 승인 기준(ROE) — 탐지(레이더 단독, EO 게이트 미적용) / 인식·식별(EO 게이트 적용, 해당 N50). 킬체인 구조가 바뀜">
+          <span className="an-field-label">요구 판별 수준 (교전 기준)</span>
           <select
             value={o.required_discrimination}
             onChange={(ev) => setOptics({ required_discrimination: ev.target.value as DiscriminationLevel })}

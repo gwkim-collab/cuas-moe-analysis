@@ -159,6 +159,23 @@ describe('computeMoe composition', () => {
     expect(r.breakdown.p_decision).toBeCloseTo(coupled.c2.decision_reliability * r.optics.recognition_prob, 6)
   })
 
+  it('engagement ROE (required_discrimination) restructures the kill chain', () => {
+    const det = scn(); det.optics.required_discrimination = 'detection'
+    const rec = scn(); rec.optics.required_discrimination = 'recognition'
+    const id = scn(); id.optics.required_discrimination = 'identification'
+    const rDet = computeMoe(det), rRec = computeMoe(rec), rId = computeMoe(id)
+    expect(rDet.optics.eo_gate_applied).toBe(false)
+    expect(rRec.optics.eo_gate_applied).toBe(true)
+    expect(rDet.p_negate).toBeGreaterThan(rRec.p_negate) // radar-only is easier
+    expect(rRec.p_negate).toBeGreaterThan(rId.p_negate) // identification is stricter
+  })
+
+  it('radar-only (detection ROE) P_negate is independent of EO pointing error', () => {
+    const a = scn(); a.optics.required_discrimination = 'detection'; a.optics.pointing_error_deg = 0.4
+    const b = scn(); b.optics.required_discrimination = 'detection'; b.optics.pointing_error_deg = 3.0
+    expect(computeMoe(a).p_negate).toBeCloseTo(computeMoe(b).p_negate, 9)
+  })
+
   it('p_negate never exceeds any single gate probability', () => {
     const r = computeMoe(scn())
     const { p_detect, p_classify, p_decision, p_reach, p_kill } = r.breakdown

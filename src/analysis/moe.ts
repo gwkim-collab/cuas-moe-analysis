@@ -52,6 +52,8 @@ export interface OpticsBreakdown {
   acquisition_prob: number
   /** Atmospheric transmission at the classify range (0..1). */
   atmospheric_transmission: number
+  /** Whether the EO gate is applied to P_classify (false for radar-only ROE). */
+  eo_gate_applied: boolean
 }
 
 export interface MoeResult {
@@ -94,6 +96,9 @@ export function computeMoe(s: Scenario): MoeResult {
   const recognition_prob = recognitionProb(s.optics, size, classify_range_m)
   const acquisition_prob = acquisitionProb(s.optics)
   const atmospheric_transmission = atmosphericTransmission(s.optics, classify_range_m)
+  // Engagement authorization (ROE): EO gate applies unless shooting on radar
+  // detection alone. (Detail below where p_classify is formed.)
+  const eo_gate_applied = s.optics.required_discrimination !== 'detection'
   const optics = {
     classify_range_m,
     pixels_on_target: pixelsOnTarget(s.optics, size, classify_range_m),
@@ -102,21 +107,31 @@ export function computeMoe(s: Scenario): MoeResult {
     pointing_sigma_deg: pointingSigmaDeg(s.optics),
     acquisition_prob,
     atmospheric_transmission,
+    eo_gate_applied,
   }
 
   const p_detect = clamp(detection.cumulative_pd, 0, 1)
-  // P_classify = acquisition (target in the fixed FOV) × optical recognition
-  // × atmospheric transmission (contrast loss) × classifier ceiling. Acquisition
-  // is what makes a too-narrow FOV hurt on a gimbal-less system.
+
+  // Engagement authorization (ROE) = required_discrimination:
+  //  · 'detection'   — shoot on radar detection ALONE. The EO is not required to
+  //    authorize the shot, so the EO gate (acquisition · recognition · atmospheric)
+  //    is NOT applied; P_classify is just the declaration confidence ceiling.
+  //  · 'recognition'/'identification' — EO must recognise/identify before approval,
+  //    so the full EO gate applies (that level's N50 lives inside recognition_prob).
+  // → 전략이 킬체인 구조를 바꾼다: 느슨한 ROE(탐지)는 P_classify가 높아지지만(실제
+  //   위협 무력화 확률↑) 오교전(민간·오인) 위험은 별도로 커진다(현 모델 미반영).
+  // P_classify — EO gate only when the ROE requires EO confirmation.
   const p_classify = clamp(
-    acquisition_prob * recognition_prob * atmospheric_transmission * s.sensor.classify_prob,
+    eo_gate_applied
+      ? acquisition_prob * recognition_prob * atmospheric_transmission * s.sensor.classify_prob
+      : s.sensor.classify_prob,
     0,
     1,
   )
-  // Operator decision, optionally coupled to EO recognition confidence: a
-  // marginal image both fails the classifier (P_classify) AND makes the human
-  // approval less reliable. coupling=0 recovers the independent gate.
-  const decision_coupling = clamp(s.c2.decision_recognition_coupling, 0, 1)
+  // Operator decision. When the shot rides on EO (recognition/identification), a
+  // marginal image also degrades human approval (coupling). On radar-only
+  // engagement the decision is not tied to EO recognition → no coupling.
+  const decision_coupling = eo_gate_applied ? clamp(s.c2.decision_recognition_coupling, 0, 1) : 0
   const p_decision = clamp(
     s.c2.decision_reliability * (1 - decision_coupling * (1 - recognition_prob)),
     0,

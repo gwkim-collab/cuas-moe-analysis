@@ -157,9 +157,9 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
   },
   'optics.n50_detection': {
     theory: `${REF_JOHNSON}: 탐지급 ≈1.0 cycle. 판별수준별 N50 상이(탐지<인식<식별).`,
-    assumption: 'N50 단위 px(≈2×cycle). 요구 판별수준="탐지"일 때만 P_classify에 사용.',
+    assumption: '⚠ 교전 기준="탐지"는 레이더 단독(EO 게이트 미적용)이라 이 값은 P_negate에 반영 안 됨(표시용). EO 기반(인식·식별)에서만 EO 게이트 적용.',
     formula: 'P = nᴱ / (1 + nᴱ),  n = N_px / N50_탐지',
-    detail: '"무언가 있다" 수준(가장 쉬움). 요구 판별수준을 탐지로 두면 원거리에서도 통과가 쉬워집니다.',
+    detail: 'EO 탐지급 문턱. 다만 현재 "탐지" 교전 기준은 레이더 탐지만으로 승인이라 EO가 안 쓰여 이 값은 결과에 영향 없음(참고용).',
     diagram: 'johnson-n50',
   },
   'optics.n50_recognition': {

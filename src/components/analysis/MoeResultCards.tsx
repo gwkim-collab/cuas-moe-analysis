@@ -80,7 +80,9 @@ export default function MoeResultCards({ result }: Props) {
       <div className="an-card">
         <div className="ab-label">EO/IR 인식 · 광학</div>
         <div className="an-gate-note ab-small">
-          P_classify = 획득 P_acq × Johnson 인식확률 × 대기투과 × 분류기 상한 (짐벌 없음 · 고정 FOV)
+          {optics.eo_gate_applied
+            ? 'P_classify = 획득 P_acq × Johnson 인식확률 × 대기투과 × 분류기 상한 (짐벌 없음 · 고정 FOV)'
+            : '탐지 기반 교전(레이더 단독) — EO 게이트 미적용. P_classify = 분류기(선언) 상한. 아래 EO 값은 참고용.'}
         </div>
         <dl className="an-readout">
           <div><dt>분류 완료 거리</dt><dd>{optics.classify_range_m.toFixed(0)} m</dd></div>
