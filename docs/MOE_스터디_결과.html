@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOE_스터디_결과.html</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body {
+  font-family: "Malgun Gothic","맑은 고딕",system-ui,-apple-system,"Segoe UI",sans-serif;
+  line-height: 1.7; color: #1c2b28; background: #f7faf9;
+  max-width: 900px; margin: 0 auto; padding: 40px 24px 80px;
+}
+h1,h2,h3,h4 { line-height: 1.3; color: #0f2320; margin: 1.8em 0 .6em; }
+h1 { font-size: 1.9rem; border-bottom: 2px solid #17a884; padding-bottom: .3em; }
+h2 { font-size: 1.4rem; border-bottom: 1px solid #d5e5e0; padding-bottom: .25em; }
+h3 { font-size: 1.12rem; color: #12695a; }
+a { color: #0f8f74; }
+code { font-family: "Cascadia Code",Consolas,monospace; background: #e7f1ee; padding: .12em .4em; border-radius: 4px; font-size: .92em; }
+pre { background: #0f2320; color: #d8f3ea; padding: 14px 16px; border-radius: 8px; overflow-x: auto; border-left: 3px solid #17a884; }
+pre code { background: none; color: inherit; padding: 0; }
+blockquote { margin: 1em 0; padding: .6em 1em; background: #eef6f3; border-left: 4px solid #17a884; color: #33504a; border-radius: 0 6px 6px 0; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: .95em; overflow-x: auto; display: block; }
+th,td { border: 1px solid #cfe2dc; padding: 7px 11px; text-align: left; }
+th { background: #17a884; color: #fff; font-weight: 600; }
+tr:nth-child(even) td { background: #f0f7f5; }
+hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
+.doc-meta { color: #6b8580; font-size: .82rem; margin-bottom: 1.5em; }
+@media (prefers-color-scheme: dark) {
+  body { color: #d8e6e2; background: #0d1a18; }
+  h1,h2,h3,h4 { color: #eafaf5; } h1 { border-color: #17a884; } h2 { border-color: #23423b; } h3 { color: #4fd6b4; }
+  code { background: #17302b; } blockquote { background: #13251f; color: #b8ccc6; }
+  th,td { border-color: #23423b; } tr:nth-child(even) td { background: #10201c; }
+  .doc-meta { color: #6b8580; }
+}
+</style>
+</head><body>
+<div class="doc-meta">AIRLOCK MOE 문서 · MD에서 자동 생성(pnpm gen:docs) · 원본은 MOE_스터디_결과.md</div>
+<h1>AIRLOCK MOE · 분석 스터디 결과</h1>
+<blockquote>
+<p>도구(<code>docs/MOE_분석도구_매뉴얼.md</code>)로 뽑은 요구사항·트레이드 분석 결과 모음.
+⚠ 모든 값은 가정·플레이스홀더 기반(가상 체계) — 경향·요구사항 도출용이며 확정 성능치 아님.
+설계 전제: 🔒 짐벌 미도입 · ⏳ 표적 크기 미정.
+ℹ️ P_negate 수치는 <strong>결심-인식 커플링=0(독립) 기준</strong> — 연구 레버 격리용. 기본값(0.5)에선 절대값이 약 3–4%p 낮으나 결론 동일.</p>
+</blockquote>
+<hr>
+<h2>S1. 표적 크기 민감도 (표적 크기 미정 → 결정 근거)</h2>
+<p>기본 시나리오(탐지 3km, σ=0.5°)에서 표적 임계 치수만 스윕:</p>
+<table>
+<thead>
+<tr>
+<th>표적 크기</th>
+<th>인식</th>
+<th>P_classify</th>
+<th>P_negate</th>
+<th>병목</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0.20 m</td>
+<td>40%</td>
+<td>19.4%</td>
+<td>17.3%</td>
+<td>classify</td>
+</tr>
+<tr>
+<td>0.35 m(가정)</td>
+<td>84%</td>
+<td>41.0%</td>
+<td>36.5%</td>
+<td>classify</td>
+</tr>
+<tr>
+<td>0.50 m</td>
+<td>97%</td>
+<td>47.3%</td>
+<td>42.2%</td>
+<td>classify</td>
+</tr>
+<tr>
+<td>0.80 m</td>
+<td>100%</td>
+<td>48.9%</td>
+<td>43.6%</td>
+<td>classify</td>
+</tr>
+<tr>
+<td>1.20 m</td>
+<td>100%</td>
+<td>48.9%</td>
+<td>43.6%</td>
+<td>classify</td>
+</tr>
+</tbody></table>
+<p><strong>해석</strong></p>
+<ul>
+<li><strong>0.5 m 미만에서 매우 민감</strong> — 0.2 m면 P_negate 17%, 0.35 m면 37%. 소형 표적일수록 인식이 급락.</li>
+<li><strong>0.5 m 이상은 포화</strong> — 인식이 100%에 수렴하면 P_negate가 ~43.6%에서 평탄(이제 P_acq·대기투과가 상한).</li>
+<li><strong>결정 시사점</strong>: 대상 기종이 <strong>소형(&lt;0.5 m)이면 표적 크기가 지배 변수</strong> → 값 확정이 결과를 크게 좌우.
+중형 이상이면 크기보다 EO 획득(지향)이 관건. → <strong>최악 케이스(소형)를 기준으로 설계</strong> 권장.</li>
+</ul>
+<h2>S2. 짐벌 없는 대안 — 최적 운용점과 정밀도 상한</h2>
+<p>짐벌 미도입 확정. 개선 레버는 **운용점(탐지/분류 거리)**과 <strong>달성 가능한 유도 정밀도 σ</strong>뿐.</p>
+<p><strong>(a) 근접 운용의 무료 이득</strong> — 현 정밀도(σ=0.5°)에서 탐지거리 운용점만 바꿔도:</p>
+<table>
+<thead>
+<tr>
+<th>운용</th>
+<th>P_negate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>기본 3.0 km</td>
+<td>36.5%</td>
+</tr>
+<tr>
+<td><strong>최적 ~2.1 km</strong></td>
+<td><strong>44.6% (+8.0%p)</strong></td>
+</tr>
+</tbody></table>
+<p>탐지거리를 2.1 km로 당기면 분류가 더 가까이서 일어나 인식↑ → <strong>하드웨어 변경 없이 +8%p</strong>.
+(단, 더 당기면 반응시간 부족으로 P_reach 하락 — 2.1 km가 최적.)</p>
+<p><strong>(b) P_negate 상한은 달성 가능 지향 σ가 결정</strong> (각 σ에서 탐지거리 최적화):</p>
+<table>
+<thead>
+<tr>
+<th>유도 정밀도 σ</th>
+<th>최적 탐지거리</th>
+<th>최대 P_negate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0.50°(현)</td>
+<td>2.1 km</td>
+<td>44.6%</td>
+</tr>
+<tr>
+<td>0.40°</td>
+<td>2.1 km</td>
+<td>54.6%</td>
+</tr>
+<tr>
+<td>0.30°</td>
+<td>2.1 km</td>
+<td>63.1%</td>
+</tr>
+<tr>
+<td>0.20°</td>
+<td>2.1 km</td>
+<td>65.9%</td>
+</tr>
+<tr>
+<td>0.15°</td>
+<td>2.1 km</td>
+<td>66.0%</td>
+</tr>
+</tbody></table>
+<p><strong>해석</strong></p>
+<ul>
+<li>짐벌 없이 현 정밀도로 <strong>현실적 상한 ≈ 45%</strong>(2.1 km 운용 시). 그 이상은 <strong>유도 정밀도</strong>에 달림.</li>
+<li>σ를 0.3°까지 조이면 ~63%까지 가능하나, <strong>σ&lt;0.2°는 이득 포화</strong>(~66% — P_reach·P_kill 등이 상한).</li>
+<li><strong>요구사항</strong>: (1) 운용점 2.1 km 채택(즉시 +8%p), (2) 유도 정밀도 σ≤0.3° 확보가 목표 60%+의 관건.</li>
+</ul>
+<h2>S3. 위협 케이스별 효과도·병목</h2>
+<table>
+<thead>
+<tr>
+<th>위협 프리셋</th>
+<th>P_negate</th>
+<th>병목</th>
+<th>인식</th>
+<th>탐지시점</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>소형 FPV(기본)</td>
+<td>36.5%</td>
+<td>classify</td>
+<td>84%</td>
+<td>2967 m</td>
+</tr>
+<tr>
+<td>고속 고정익</td>
+<td>40.0%</td>
+<td>classify</td>
+<td>100%</td>
+<td>4000 m</td>
+</tr>
+<tr>
+<td>저피탐 초소형</td>
+<td>31.2%</td>
+<td>classify</td>
+<td>68%</td>
+<td>2356 m</td>
+</tr>
+<tr>
+<td>근거리 급습</td>
+<td>14.6%</td>
+<td><strong>reach</strong></td>
+<td>100%</td>
+<td>1500 m</td>
+</tr>
+<tr>
+<td>안개 · 저시정</td>
+<td><strong>0.0%</strong></td>
+<td>classify</td>
+<td>84%</td>
+<td>2967 m</td>
+</tr>
+<tr>
+<td>야간 · EO 저하</td>
+<td>5.9%</td>
+<td>classify</td>
+<td>84%</td>
+<td>2967 m</td>
+</tr>
+</tbody></table>
+<p><strong>해석 — 병목은 위협/환경마다 다름</strong></p>
+<ul>
+<li>대부분 **classify(EO)**가 병목 → EO 획득·인식이 체계의 핵심 취약점.</li>
+<li><strong>근거리 급습은 reach(도달)</strong> — 짧은 진입거리로 반응시간 부족. 대응은 탐지 조기화·반응예산 단축.</li>
+<li><strong>안개에서 P_negate 0%, 야간 6%</strong> — EO 의존 체계의 치명적 한계. <strong>저시정/야간 대안</strong>(IR 대역·근접 교전·
+대체 센서)이 없으면 악천후 시 사실상 무력. → <strong>운용 요구사항으로 명시 필요</strong>.</li>
+</ul>
+<hr>
+<h2>종합 결론 (요구사항)</h2>
+<ol>
+<li><strong>표적 크기 확정이 시급</strong> — 특히 소형(&lt;0.5 m) 가정 시 결과 지배. 최악 케이스로 설계.</li>
+<li><strong>짐벌 없이 즉시 개선</strong>: 운용점 2.1 km 채택(+8%p). 그 위 상한은 <strong>유도 정밀도 σ</strong>가 결정(σ≤0.3° → ~63%).</li>
+<li><strong>악천후 취약</strong>: 안개·야간에서 EO 붕괴(0~6%). 대체 수단이 핵심 미해결 요구사항.</li>
+</ol>
+<p><em>방법: 각 표는 도구의 스윕/역산으로 산출. 값은 가정 기반이므로 절대값보다 경향·임계·상한을 볼 것.</em></p>
+
+</body></html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>README.html</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body {
+  font-family: "Malgun Gothic","맑은 고딕",system-ui,-apple-system,"Segoe UI",sans-serif;
+  line-height: 1.7; color: #1c2b28; background: #f7faf9;
+  max-width: 900px; margin: 0 auto; padding: 40px 24px 80px;
+}
+h1,h2,h3,h4 { line-height: 1.3; color: #0f2320; margin: 1.8em 0 .6em; }
+h1 { font-size: 1.9rem; border-bottom: 2px solid #17a884; padding-bottom: .3em; }
+h2 { font-size: 1.4rem; border-bottom: 1px solid #d5e5e0; padding-bottom: .25em; }
+h3 { font-size: 1.12rem; color: #12695a; }
+a { color: #0f8f74; }
+code { font-family: "Cascadia Code",Consolas,monospace; background: #e7f1ee; padding: .12em .4em; border-radius: 4px; font-size: .92em; }
+pre { background: #0f2320; color: #d8f3ea; padding: 14px 16px; border-radius: 8px; overflow-x: auto; border-left: 3px solid #17a884; }
+pre code { background: none; color: inherit; padding: 0; }
+blockquote { margin: 1em 0; padding: .6em 1em; background: #eef6f3; border-left: 4px solid #17a884; color: #33504a; border-radius: 0 6px 6px 0; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: .95em; overflow-x: auto; display: block; }
+th,td { border: 1px solid #cfe2dc; padding: 7px 11px; text-align: left; }
+th { background: #17a884; color: #fff; font-weight: 600; }
+tr:nth-child(even) td { background: #f0f7f5; }
+hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
+.doc-meta { color: #6b8580; font-size: .82rem; margin-bottom: 1.5em; }
+@media (prefers-color-scheme: dark) {
+  body { color: #d8e6e2; background: #0d1a18; }
+  h1,h2,h3,h4 { color: #eafaf5; } h1 { border-color: #17a884; } h2 { border-color: #23423b; } h3 { color: #4fd6b4; }
+  code { background: #17302b; } blockquote { background: #13251f; color: #b8ccc6; }
+  th,td { border-color: #23423b; } tr:nth-child(even) td { background: #10201c; }
+  .doc-meta { color: #6b8580; }
+}
+</style>
+</head><body>
+<div class="doc-meta">AIRLOCK MOE 문서 · MD에서 자동 생성(pnpm gen:docs) · 원본은 README.md</div>
+<h1>AIRLOCK 효과도(MOE)·시스템 분석 도구 — 문서 허브</h1>
+<p>C-UAS 요격 체계(AB-U10)의 효과도와 시스템 트레이드오프를 분석하고, <strong>요구사항을 도출</strong>하는 도구.
+이 저장소(airlock-c2)의 <code>feat/effectiveness-analysis</code> 브랜치에 구축. (경로는 모두 <strong>저장소 루트</strong> 기준.
+AIRLOCK 워크스페이스에서는 이 저장소가 <code>components/c2/</code>에 위치)</p>
+<h2>📄 문서</h2>
+<table>
+<thead>
+<tr>
+<th>문서</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><a href="./MOE_%EB%B6%84%EC%84%9D%EB%8F%84%EA%B5%AC_%EB%A7%A4%EB%89%B4%EC%96%BC.md">MOE_분석도구_매뉴얼.md</a></strong></td>
+<td>사용법·화면·킬체인 모델(물리 5층+근거)·파라미터·CSV/리포트·몬테카를로 설계·한계. 요구사항 도출 예시(탐지거리·EO 스펙) 포함</td>
+</tr>
+<tr>
+<td><strong><a href="./MOE_%EC%8A%A4%ED%84%B0%EB%94%94_%EA%B2%B0%EA%B3%BC.md">MOE_스터디_결과.md</a></strong></td>
+<td>분석 결과(findings): 표적크기 민감도 · 짐벌 없는 대안 · 위협 케이스별 효과도</td>
+</tr>
+</tbody></table>
+<h2>▶ 실행 (저장소 루트에서)</h2>
+<ul>
+<li><strong>원클릭</strong>: 루트의 <code>run.cmd</code> 더블클릭(의존성 자동 설치 후 서버+브라우저)</li>
+<li><strong>터미널</strong>: <code>pnpm install</code> (최초 1회) → <code>pnpm start</code> (= <code>vite --open</code>) → <a href="http://localhost:5174/">http://localhost:5174/</a></li>
+<li>운용 화면 우상단 &quot;효과도 분석 ▸&quot; 버튼 / <code>A</code> 키로 분석 진입</li>
+<li>검증: <code>pnpm gen:sample</code> · <code>pnpm exec tsc -b</code> · <code>pnpm test</code> (= vitest, 59 tests)</li>
+</ul>
+<h2>🔒 설계 결정 / ⏳ 미정</h2>
+<ul>
+<li>🔒 <strong>짐벌 미도입</strong>(확정) — EO 기체 고정, 획득 P_acq 상시 적용. 개선 레버는 짐벌이 아님.</li>
+<li>⏳ <strong>표적 크기</strong>(미정) — 대상 기종 향후 결정. 인식·P_classify에 민감.</li>
+</ul>
+<h2>🎯 핵심 결론(요구사항 도출)</h2>
+<ol>
+<li><strong>필요 탐지거리 ~2km면 충분</strong> — 최적 2.1km에서 P_negate 정점(그 이상은 원거리 분류로 하락). 2.1km 운용만으로 +8%p.</li>
+<li><strong>진짜 병목은 EO 분류(P_classify)</strong> — 짐벌이 없어 표적을 좁은 화면에 넣는 <strong>조준 정밀도 σ</strong>(=√(큐²+유도²))가 관건.
+목표 60%+ 달성하려면 <strong>σ≤0.3°</strong> 필요(현 σ0.5°는 상한 ~45%). σ는 겨냥이 표적에서 빗나가는 각도 오차.</li>
+<li><strong>표적 크기 &lt;0.5m면 결과 지배</strong> — 소형 가정 시 값 확정이 핵심.</li>
+<li><strong>악천후 취약</strong> — 안개 0%·야간 6%. EO 의존 체계의 최대 미해결 과제(대체 센서/근접 대안 필요).</li>
+</ol>
+<h2>🧱 무엇을 갖췄나 (개발 경위 요약)</h2>
+<ul>
+<li><strong>모델</strong>: 킬체인 곱(P_detect·P_classify·P_decision·P_reach·P_kill). 물리 5층 —
+레이더 탐지(R∝RCS^¼·로지스틱 Pd·누적) / 획득 P_acq(짐벌리스 Rayleigh) / Johnson 인식(판별수준별 N50: 탐지·인식·식별) /
+대기감쇠(Koschmieder+Beer-Lambert) / 3D 경사거리 / 교전 기하(연속 P_reach·체공 한계).</li>
+<li><strong>UI</strong>: 6탭(교전·커버리지·트레이드·스펙역산·시나리오비교·파라미터설명; 교전 내 해석식↔몬테카를로 전환).
+파라미터별 ⓘ 수식·그림·근거 3분리(이론/가정/값).
+병목 진단 대시보드. 넷건/샷건 독립 입력(활성 강조).</li>
+<li><strong>운용성</strong>: 프리셋(위협·날씨 6종)·명명 저장/불러오기·A/B 비교.</li>
+<li><strong>입출력</strong>: CSV 왕복(근거 열 포함·Excel 호환)·JSON·리포트(MD). 값은 CSV만으로 전부 편집 가능.</li>
+<li><strong>몬테카를로</strong>: aleatory 13변수 난수화 + 킬체인 베르누이. epistemic(값 자체)은 별도 권장.</li>
+<li><strong>값 방침</strong>: 가상 체계라 값=가정/요구사항. &quot;가정·입력값(미확정)&quot; 라벨, 추측 금지. 도구 용도는 &quot;요구사항 도출&quot;.</li>
+</ul>
+<h2>상태</h2>
+<ul>
+<li>브랜치 <code>feat/effectiveness-analysis</code> · <strong>전부 로컬 커밋(미푸시)</strong> · suite <code>main</code>도 manifest 1커밋 미푸시</li>
+<li>미해결(사용자 신호 대기): 실측/스펙 확정 시 반영 · 원격 푸시 · integration 게이트(G3) 문서</li>
+</ul>
+
+</body></html>
