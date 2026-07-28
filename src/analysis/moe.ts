@@ -90,15 +90,13 @@ export function computeMoe(s: Scenario): MoeResult {
   const detection = computeDetection(s.sensor, s.threat, s.site.keep_out_radius_m)
   const reach = reachSolution(s, detection.detect_at_range_m)
 
-  // EO/IR recognition · classification concludes classify_time after the
-  // radar detection, by which point the threat has closed. Recognition is
-  // evaluated at that (closer) range — more pixels on target = easier. The EO
-  // sees the slant (LOS) range, so optics use √(horizontal² + altitude²).
-  const classify_h_m = Math.max(
-    1,
-    detection.detect_at_range_m - s.threat.speed_m_s * s.sensor.classify_time_s,
-  )
-  const classify_range_m = slantRange(classify_h_m, s.threat.altitude_m_agl)
+  // EO/IR recognition · classification concludes at the range back-solved from
+  // the launch point (kinematics.classify_at_range_m) — as close, and therefore
+  // as sharp, as the decision timeline allows. Engagement is doctrine-driven, so
+  // detecting earlier moves this range NOT AT ALL until detection becomes the
+  // binding constraint. The EO sees the slant (LOS) range, so optics use
+  // √(horizontal² + altitude²).
+  const classify_range_m = slantRange(reach.classify_at_range_m, s.threat.altitude_m_agl)
   const size = s.threat.characteristic_size_m
   const recognition_prob = recognitionProb(s.optics, size, classify_range_m)
   const acquisition_prob = acquisitionProb(s.optics)

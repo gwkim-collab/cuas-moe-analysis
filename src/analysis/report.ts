@@ -76,8 +76,30 @@ export function reportToMarkdown(report: AnalysisReport): string {
   lines.push(`| P_decision · 결심 | ${pct(b.p_decision)} |`)
   lines.push(`| P_reach · 도달 | ${pct(b.p_reach)} |`)
   lines.push(`| P_kill · 살상 | ${pct(b.p_kill)} |`)
+  lines.push(`| 발사 개시 거리 (교리) | ${e.reach.commit_range_m.toFixed(0)} m |`)
+  lines.push(`| 발사 시 위협 거리 | ${e.reach.threat_range_at_launch_m.toFixed(0)} m |`)
   lines.push(`| 요격 거리 (자산 기준) | ${e.reach.intercept_range_m.toFixed(0)} m |`)
   lines.push(`| Keep-out 여유 | ${e.reach.margin_m.toFixed(0)} m · ${e.reach.margin_s.toFixed(1)} s |`)
+  lines.push('')
+  lines.push('### 1-1. 탐지 요구 충족 여부')
+  lines.push('')
+  lines.push(
+    '> 교전은 교리(발사 개시 거리)로 개시됩니다. 탐지는 반응 예산을 그 거리 앞에서 소화할 수 있을 때만 무해하며, ' +
+      '필요치를 넘는 탐지 성능은 **여유만 늘리고 P_negate를 올리지 않습니다.**',
+  )
+  lines.push('')
+  lines.push('| 지표 | 값 |')
+  lines.push('|---|---|')
+  lines.push(`| 탐지 시점 거리 | ${e.reach.detect_at_range_m.toFixed(0)} m |`)
+  lines.push(
+    `| 필요 탐지거리 (= 발사개시 + v_t·반응예산) | ${e.reach.required_detection_range_m.toFixed(0)} m |`,
+  )
+  lines.push(
+    `| 탐지 여유 | ${e.reach.detection_margin_m.toFixed(0)} m · ${e.reach.detection_margin_s.toFixed(1)} s |`,
+  )
+  lines.push(
+    `| 판정 | ${e.reach.detection_limited ? '⚠ **탐지 제약** — 교리상 발사 개시 거리를 지키지 못함' : '✓ 교리 지배 — 탐지 충분'} |`,
+  )
   lines.push('')
   lines.push('## 2. EO/IR 인식 · 획득 (P_classify 구성)')
   lines.push('')

@@ -34,7 +34,7 @@ const STAGE_LABEL: Record<StageKey, string> = {
 }
 
 const RECO: Record<StageKey, string> = {
-  detect: '레이더 탐지거리·재방문 주기 개선, 표적 RCS 가정 재확인(고도가 높으면 경사거리 불리).',
+  detect: '재방문 주기·스캔수를 먼저 보세요 — 누적 탐지는 재방문×속도(스캔수)가 지배하고, 탐지거리·RCS는 잘 안 움직입니다.',
   classify: '분류가 병목 — 아래 하위 요인부터 개선하세요.',
   decision: '결심 지연을 줄이고 결심 신뢰도를 높이세요(반응 예산 여유 확보).',
   reach: '순항속도↑·반응예산↓·요격기 도달 반경/발사대 배치 조정, keep-out 여유 확보.',
@@ -67,6 +67,18 @@ export function diagnoseBottleneck(r: MoeResult): BottleneckDiagnosis {
       '대기 투과 (시정)': '저시정이 지배 — 교전거리를 당기거나 IR/근접 대안 검토.',
     }
     recommendation = `분류 병목의 최약 요인: ${subFactor.label}. ${lever[subFactor.label]}`
+  }
+
+  // Detection can bind WITHOUT being the lowest gate: if it arrives too late for
+  // the commit range, the engagement is dragged inward and every downstream
+  // stage is solved off the wrong launch point. That outranks the gate minimum.
+  if (r.reach.detection_limited) {
+    recommendation =
+      `⚠ 탐지 제약: 필요 탐지거리 ${r.reach.required_detection_range_m.toFixed(0)} m에 ` +
+      `${Math.abs(r.reach.detection_margin_m).toFixed(0)} m 모자라 교리상 발사 개시 거리` +
+      `(${r.reach.commit_range_m.toFixed(0)} m)를 지키지 못합니다. 탐지거리를 늘리거나, ` +
+      `반응 예산(분류·결심·발사 지연)을 줄이거나, 발사 개시 거리를 낮추세요. ` +
+      `그 다음 병목 — ${recommendation}`
   }
 
   return { stage: min.key, label: STAGE_LABEL[min.key], value: min.v, subFactor, recommendation }

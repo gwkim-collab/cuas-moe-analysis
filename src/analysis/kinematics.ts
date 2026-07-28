@@ -8,12 +8,23 @@
 // enough to answer "does the interceptor reach the threat outside
 // the keep-out ring, in time?" and to expose the timeline budget.
 //
-//   t=0 (detect): threat at R_det, closing at v_t.
+// ENGAGEMENT IS DOCTRINE-DRIVEN, NOT DETECTION-DRIVEN.
+// The system has a commit (launch) range it engages at. Detecting
+// earlier does not make it shoot earlier — it only buys margin.
+// Detection binds only when it is too LATE to honour the doctrine:
+//
+//   R_launch = min(R_commit, R_detect − v_t·t_react)
+//   R_required_detection = R_commit + v_t·t_react
+//
 //   react window: classify + operator decision + launch delay.
-//   at launch: threat at R_launch = R_det − v_t·t_react.
 //   interceptor from pad (R_pad) flies out at v_i; threat flies in
 //   at v_t → they close the gap (R_launch − R_pad) at (v_i + v_t).
 //   intercept range from asset R_int = R_pad + v_i·t_meet.
+//
+// Classification is back-solved from the launch point rather than
+// pinned to detection + t_classify: the crew classifies as LATE (as
+// close, so as sharp) as the decision timeline permits. The two
+// coincide exactly in the detection-limited branch.
 //
 // Feasible iff the intercept happens before the threat crosses the
 // keep-out ring, within the interceptor's max reach, and the threat
@@ -32,8 +43,27 @@ export interface TimeBudget {
 export interface ReachSolution {
   detect_at_range_m: number
   budget: TimeBudget
+  /** Doctrinal commit (launch) range (m) — where the system intends to launch. */
+  commit_range_m: number
+  /**
+   * Detection range (m) needed to honour the commit range:
+   * R_commit + v_t·t_react. Detection beyond this buys margin but no performance.
+   */
+  required_detection_range_m: number
+  /** Detection margin (m): detect_at − required. Negative = detection-limited. */
+  detection_margin_m: number
+  /** The same margin expressed as threat flight time (s). */
+  detection_margin_s: number
+  /** True when detection was too late to launch at the commit range. */
+  detection_limited: boolean
   /** Threat range from asset at the moment the interceptor launches (m). */
   threat_range_at_launch_m: number
+  /**
+   * Horizontal threat range (m) at which classification must conclude — back-
+   * solved from launch: R_launch + v_t·(t_decision + t_launch). Drives the EO
+   * geometry in moe.ts.
+   */
+  classify_at_range_m: number
   /** Time from launch to intercept (s). */
   time_to_meet_s: number
   /** Range from asset where intercept occurs (m). */
@@ -91,12 +121,33 @@ export function reachSolution(s: Scenario, detect_at_range_m: number): ReachSolu
   const enduranceReach = vI * s.effector.endurance_s
   const maxReach = Math.min(s.effector.max_engagement_range_m, enduranceReach)
 
-  const threat_range_at_launch_m = detect_at_range_m - vT * budget.react_total_s
+  // Doctrine: launch at the commit range. Detection only binds when it is too
+  // late for the reaction budget to fit before that range.
+  const commit_range_m = s.effector.commit_range_m
+  const required_detection_range_m = commit_range_m + vT * budget.react_total_s
+  const detection_margin_m = detect_at_range_m - required_detection_range_m
+  const earliest_launch_m = detect_at_range_m - vT * budget.react_total_s
+  const detection_limited = earliest_launch_m < commit_range_m
+  const threat_range_at_launch_m = Math.min(commit_range_m, earliest_launch_m)
+
+  // Classification concludes just far enough ahead of launch to leave room for
+  // the decision and launch delay — i.e. as close (as sharp an image) as the
+  // timeline allows. Detection-limited case reduces to detect_at − v_t·t_classify.
+  const classify_at_range_m = Math.max(
+    1,
+    threat_range_at_launch_m + vT * (budget.decision_s + budget.launch_delay_s),
+  )
 
   const base: Omit<ReachSolution, 'feasible' | 'reason' | 'margin_m' | 'margin_s' | 'reach_probability'> = {
     detect_at_range_m,
     budget,
+    commit_range_m,
+    required_detection_range_m,
+    detection_margin_m,
+    detection_margin_s: detection_margin_m / vT,
+    detection_limited,
     threat_range_at_launch_m,
+    classify_at_range_m,
     time_to_meet_s: 0,
     intercept_range_m: 0,
   }

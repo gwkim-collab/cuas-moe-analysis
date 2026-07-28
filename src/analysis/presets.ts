@@ -51,7 +51,10 @@ export const PRESETS: ScenarioPreset[] = [
     note: '큰 RCS·큰 표적이나 고속 — 반응 예산이 빡빡.',
     build: () =>
       withOverrides({
-        threat: { rcs_m2: 0.05, speed_m_s: 60, altitude_m_agl: 150, characteristic_size_m: 1.2, ingress_range_m: 4000 },
+        // ingress 6000: a fast threat needs a longer analysis window than the
+        // required detection range (3000 + 60·20 = 4200 m), or the window itself
+        // becomes the binding constraint instead of the radar.
+        threat: { rcs_m2: 0.05, speed_m_s: 60, altitude_m_agl: 150, characteristic_size_m: 1.2, ingress_range_m: 6000 },
       }),
   },
   {

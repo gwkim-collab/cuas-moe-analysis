@@ -8,6 +8,8 @@ import {
   reachSolution,
   computeDetection,
   diagnoseBottleneck,
+  pdHalfPointRange,
+  rangeForPd,
   type Scenario,
 } from '../index'
 
@@ -19,9 +21,35 @@ function scn(): Scenario {
 describe('detection model', () => {
   it('scales detection range with RCS^(1/4)', () => {
     const s = scn().sensor
-    // 16× the reference RCS → 2× the range (16^0.25 = 2).
+    // 16× the reference RCS → 2× the range (16^0.25 = 2). The scaled quantity is
+    // the logistic centre, which is derived from (quoted range, Pd there).
     const r = detectionRangeForRcs(s, s.ref_rcs_m2 * 16)
-    expect(r).toBeCloseTo(s.ref_detection_range_m * 2, 5)
+    expect(r).toBeCloseTo(pdHalfPointRange(s) * 2, 5)
+  })
+
+  it('intuitive input round-trips: quoted range is exactly where pd = pd_at_ref', () => {
+    const s = scn().sensor
+    // The user says "RCS₀ at R_q with Pd = p_q"; the model must reproduce it.
+    expect(pdAtRange(s, s.ref_rcs_m2, s.ref_detection_range_m)).toBeCloseTo(s.pd_at_ref, 9)
+    expect(rangeForPd(s, s.ref_rcs_m2, s.pd_at_ref)).toBeCloseTo(s.ref_detection_range_m, 6)
+  })
+
+  it('logistic centre sits BEYOND the quoted range when the quoted Pd > pd_max/2', () => {
+    const s = scn().sensor
+    // Feeding "Pd 0.9 @ 3 km" straight in as the centre would model a worse radar.
+    expect(s.pd_at_ref).toBeGreaterThan(s.pd_max / 2)
+    expect(pdHalfPointRange(s)).toBeGreaterThan(s.ref_detection_range_m)
+  })
+
+  it('a HIGHER quoted Pd at the same quoted range means a better radar', () => {
+    const strict = scn().sensor // "Pd 0.9 @ 3 km"
+    const loose = { ...strict, pd_at_ref: 0.5 } // only "Pd 0.5 @ 3 km"
+    // Holding 0.9 out at 3 km takes a curve pushed farther out than one that
+    // only manages 0.5 there — so the whole detection envelope is longer.
+    expect(pdHalfPointRange(strict)).toBeGreaterThan(pdHalfPointRange(loose))
+    expect(pdAtRange(strict, strict.ref_rcs_m2, 4000)).toBeGreaterThan(
+      pdAtRange(loose, loose.ref_rcs_m2, 4000),
+    )
   })
 
   it('pd is pd_max/2 at the nominal detection range and higher when closer', () => {
@@ -63,6 +91,108 @@ describe('engagement kill probability', () => {
   it('is clamped to [0,1]', () => {
     expect(cumulativePk(1.5, 2)).toBe(1)
     expect(cumulativePk(-0.2, 2)).toBe(0)
+  })
+})
+
+describe('doctrine-driven engagement (commit range)', () => {
+  // Helper: solve the full chain for a scenario.
+  const solve = (s: Scenario) => {
+    const d = computeDetection(s.sensor, s.threat, s.site.keep_out_radius_m)
+    return reachSolution(s, d.detect_at_range_m)
+  }
+
+  it('required detection range = commit + v_t · t_react', () => {
+    const s = scn()
+    const r = solve(s)
+    const tReact = s.sensor.classify_time_s + s.c2.decision_latency_s + s.effector.launch_delay_s
+    expect(r.required_detection_range_m).toBeCloseTo(
+      s.effector.commit_range_m + s.threat.speed_m_s * tReact,
+      6,
+    )
+  })
+
+  it('launches AT the commit range when detection is adequate, not earlier', () => {
+    const s = scn()
+    s.sensor.ref_detection_range_m = 6000 // far more detection than required
+    const r = solve(s)
+    expect(r.detection_limited).toBe(false)
+    expect(r.threat_range_at_launch_m).toBeCloseTo(s.effector.commit_range_m, 6)
+    expect(r.detection_margin_m).toBeGreaterThan(0)
+  })
+
+  it('detection beyond the requirement buys margin but changes nothing else', () => {
+    const near = scn(); near.sensor.ref_detection_range_m = 3200
+    const far = scn(); far.sensor.ref_detection_range_m = 6000
+    const rNear = computeMoe(near), rFar = computeMoe(far)
+    expect(rNear.reach.detection_limited).toBe(false)
+    expect(rFar.reach.detection_limited).toBe(false)
+    // The whole point: better detection must NOT move the engagement.
+    expect(rFar.reach.threat_range_at_launch_m).toBeCloseTo(rNear.reach.threat_range_at_launch_m, 6)
+    expect(rFar.optics.classify_range_m).toBeCloseTo(rNear.optics.classify_range_m, 6)
+    expect(rFar.p_negate).toBeCloseTo(rNear.p_negate, 9)
+    // ...it only widens the detection margin.
+    expect(rFar.reach.detection_margin_m).toBeGreaterThan(rNear.reach.detection_margin_m)
+  })
+
+  it('REGRESSION: raising pd_max no longer degrades P_negate', () => {
+    // Before the commit range existed, launch (and therefore classification) was
+    // pinned to detection, so a better radar classified FARTHER out and P_negate
+    // fell — 40.3% → 33.6% across this same sweep. It must now be flat.
+    const base = computeMoe(scn()).p_negate
+    for (const pd_max of [0.92, 0.95, 0.98, 0.99]) {
+      const s = scn(); s.sensor.pd_max = pd_max
+      expect(computeMoe(s).p_negate).toBeCloseTo(base, 9)
+    }
+  })
+
+  it('falls back to "launch as soon as possible" when detection is too late', () => {
+    const s = scn()
+    s.sensor.ref_detection_range_m = 1500 // well inside the required 3.66 km
+    const r = solve(s)
+    const tReact = r.budget.react_total_s
+    expect(r.detection_limited).toBe(true)
+    expect(r.detection_margin_m).toBeLessThan(0)
+    expect(r.threat_range_at_launch_m).toBeCloseTo(r.detect_at_range_m - s.threat.speed_m_s * tReact, 6)
+    expect(r.threat_range_at_launch_m).toBeLessThan(s.effector.commit_range_m)
+  })
+
+  it('classification is back-solved from launch, and reduces to detect − v·t_classify when detection-limited', () => {
+    const s = scn()
+    const doctrine = solve(s)
+    expect(doctrine.classify_at_range_m).toBeCloseTo(
+      doctrine.threat_range_at_launch_m +
+        s.threat.speed_m_s * (s.c2.decision_latency_s + s.effector.launch_delay_s),
+      6,
+    )
+
+    const late = scn()
+    late.sensor.ref_detection_range_m = 1500
+    const rLate = solve(late)
+    expect(rLate.detection_limited).toBe(true)
+    expect(rLate.classify_at_range_m).toBeCloseTo(
+      rLate.detect_at_range_m - late.threat.speed_m_s * late.sensor.classify_time_s,
+      6,
+    )
+  })
+
+  it('bottleneck flags the detection shortfall even when detect is not the lowest gate', () => {
+    const s = scn()
+    s.sensor.ref_detection_range_m = 1500
+    const r = computeMoe(s)
+    expect(r.reach.detection_limited).toBe(true)
+    expect(r.breakdown.p_detect).toBeGreaterThan(r.breakdown.p_classify) // detect is NOT the min gate
+    expect(diagnoseBottleneck(r).recommendation).toContain('탐지 제약')
+  })
+
+  it('a longer commit range pushes the EO recognition requirement outward', () => {
+    const near = scn(); near.effector.commit_range_m = 1500
+    const far = scn(); far.effector.commit_range_m = 3000
+    const rNear = computeMoe(near), rFar = computeMoe(far)
+    expect(rFar.optics.classify_range_m).toBeGreaterThan(rNear.optics.classify_range_m)
+    expect(rFar.optics.recognition_prob).toBeLessThan(rNear.optics.recognition_prob)
+    expect(rFar.reach.required_detection_range_m).toBeGreaterThan(rNear.reach.required_detection_range_m)
+    // ...and buys standoff: the intercept happens farther from the asset.
+    expect(rFar.reach.intercept_range_m).toBeGreaterThan(rNear.reach.intercept_range_m)
   })
 })
 
@@ -116,9 +246,11 @@ describe('computeMoe composition', () => {
   })
 
   it('default scenario is feasible and negates the threat with meaningful probability', () => {
+    // ≈23% at defaults. The 3 km commit doctrine forces the EO to recognise at
+    // ~3.46 km, which is what holds this down — see the commit-range trade.
     const r = computeMoe(scn())
     expect(r.feasible).toBe(true)
-    expect(r.p_negate).toBeGreaterThan(0.3)
+    expect(r.p_negate).toBeGreaterThan(0.2)
   })
 
   it('infeasible geometry drives p_reach and p_negate to zero', () => {

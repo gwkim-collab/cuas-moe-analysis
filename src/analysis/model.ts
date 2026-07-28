@@ -37,15 +37,38 @@ export interface ThreatSpec {
 export interface SensorSpec {
   /** Reference RCS (m²) at which `ref_detection_range_m` is quoted. */
   ref_rcs_m2: number
-  /** Detection range (m) for a target of `ref_rcs_m2`. SME-VERIFY */
+  /**
+   * INTUITIVE INPUT ①: "이 거리에서 탐지한다" (m), for a target of `ref_rcs_m2`.
+   * Paired with `pd_at_ref` — the quoted range means nothing without the
+   * probability it is quoted AT. The internal logistic centre is DERIVED from
+   * the pair (see detection.pdHalfPointRange), it is NOT this value. SME-VERIFY
+   */
   ref_detection_range_m: number
-  /** Peak single-look detection probability well inside range (0..1). SME-VERIFY */
+  /**
+   * INTUITIVE INPUT ②: single-look detection probability AT `ref_detection_range_m`
+   * (0..1). Radar specs quote detection range at a stated Pd (commonly 0.8-0.9 at
+   * Pfa 1e-6), so this is the number a datasheet actually gives you. Must be
+   * < `pd_max`. SME-VERIFY
+   */
+  pd_at_ref: number
+  /**
+   * ADVANCED (curve shape): peak single-look detection probability well inside
+   * range (0..1) — the logistic ceiling. Not a spec number; leave at default
+   * unless modelling a sensor with a known sub-unity ceiling. SME-VERIFY
+   */
   pd_max: number
-  /** Logistic transition width (m) around the max-range boundary — larger = softer edge. */
+  /** ADVANCED (curve shape): logistic transition width (m) — larger = softer edge. */
   pd_transition_width_m: number
   /** Scan revisit interval (s) — how often a fresh detection opportunity occurs. SME-VERIFY */
   revisit_time_s: number
-  /** Time to classify/confirm a track as hostile after first detection (s). SME-VERIFY */
+  /**
+   * MINIMUM time to classify/confirm a track as hostile after first detection (s).
+   * It sets how far ahead of the commit range detection must happen
+   * (required_detection_range = commit + v_t·t_react); it does NOT by itself fix
+   * when classification concludes — that is back-solved from the launch point,
+   * so a doctrine-limited engagement classifies as LATE (= as close) as the
+   * decision timeline allows. SME-VERIFY
+   */
   classify_time_s: number
   /**
    * Classifier ceiling (0..1): probability the target is correctly declared
@@ -106,6 +129,14 @@ export interface EffectorSpec {
   launch_delay_s: number
   /** Interceptor outbound cruise speed (m/s). ~50 m/s matches the mockup. SME-VERIFY */
   cruise_speed_m_s: number
+  /**
+   * DOCTRINE — commit (launch) range: the threat range from the asset at which
+   * we intend to launch. Engagement is doctrine-driven, not detection-driven:
+   * detecting earlier does NOT mean shooting earlier, it only buys margin.
+   * Actual launch = min(commit_range, detect_at − v_t·t_react), so detection
+   * matters only when it is too LATE to honour the doctrine. SME-VERIFY
+   */
+  commit_range_m: number
   /** Max useful range from the launch pad the interceptor can reach (m). SME-VERIFY */
   max_engagement_range_m: number
   /** Launch pad distance from the protected asset (m). 0 = co-located. */
@@ -186,7 +217,10 @@ export const DEFAULT_THREAT: ThreatSpec = {
   rcs_m2: 0.01,
   speed_m_s: 32.8,
   altitude_m_agl: 85,
-  ingress_range_m: 3000,
+  // Analysis window start. Must sit comfortably OUTSIDE the required detection
+  // range (commit + v_t·t_react ≈ 3.66 km at defaults), otherwise the track
+  // begins inside the radar's reach and the detection margin cannot be shown.
+  ingress_range_m: 6000,
   approach_bearing_deg: 315,
   characteristic_size_m: 0.35,
 }
@@ -194,6 +228,7 @@ export const DEFAULT_THREAT: ThreatSpec = {
 export const DEFAULT_SENSOR: SensorSpec = {
   ref_rcs_m2: 0.01,
   ref_detection_range_m: 3000,
+  pd_at_ref: 0.9, // "0.01 m²를 3 km에서 Pd 0.9로 탐지" — 데이터시트가 실제로 주는 형태
   pd_max: 0.98,
   pd_transition_width_m: 300,
   revisit_time_s: 1.0,
@@ -223,6 +258,7 @@ export const DEFAULT_EFFECTOR: EffectorSpec = {
   payload: 'net_gun',
   launch_delay_s: 4.0,
   cruise_speed_m_s: 50,
+  commit_range_m: 3000, // 발사 개시 거리(교리) — 운용 요구값
   max_engagement_range_m: 2500,
   launch_pad_range_from_asset_m: 0,
   single_shot_pk_net: 0.7,

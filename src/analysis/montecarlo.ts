@@ -134,7 +134,11 @@ function sampleScenario(base: Scenario, u: McUncertainty, rng: Rng): Scenario {
   const size = Math.max(0.01, base.threat.characteristic_size_m * (1 + u.size_cv * normal(rng)))
   const cue = Math.max(0, base.optics.cue_error_deg + u.cue_error_sd_deg * normal(rng))
   const cruise = Math.max(1, base.effector.cruise_speed_m_s * (1 + u.cruise_speed_cv * normal(rng)))
-  const shots = Math.max(0, Math.round(base.effector.shot_opportunities + u.shot_opportunities_sd * normal(rng)))
+  // Floor at 1, not 0: this branch only runs for trials that reached the kill
+  // gate, i.e. the interceptor arrived. "Arrived and fired zero times" is not a
+  // physical outcome — a 0 here silently forced P_kill = 0 on ~1.6% of trials
+  // at the default (mean 2, sd 0.7), inflating kill-gate failures.
+  const shots = Math.max(1, Math.round(base.effector.shot_opportunities + u.shot_opportunities_sd * normal(rng)))
 
   return {
     ...base,

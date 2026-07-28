@@ -40,12 +40,21 @@ hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
 <blockquote>
 <p>도구(<code>docs/MOE_분석도구_매뉴얼.md</code>)로 뽑은 요구사항·트레이드 분석 결과 모음.
 ⚠ 모든 값은 가정·플레이스홀더 기반(가상 체계) — 경향·요구사항 도출용이며 확정 성능치 아님.
-설계 전제: 🔒 짐벌 미도입 · ⏳ 표적 크기 미정.
-ℹ️ P_negate 수치는 <strong>결심-인식 커플링=0(독립) 기준</strong> — 연구 레버 격리용. 기본값(0.5)에선 절대값이 약 3–4%p 낮으나 결론 동일.</p>
+설계 전제: 🔒 짐벌 미도입 · ⏳ 표적 크기 미정 · 📏 <strong>발사 개시 거리(대응 거리) 3 km</strong>.
+ℹ️ P_negate 수치는 <strong>결심-인식 커플링=0(독립) 기준</strong> — 연구 레버 격리용. 기본값(0.5)에선 절대값이 약 4%p 낮으나 결론 동일.</p>
+</blockquote>
+<blockquote>
+<p>🔄 <strong>개정 이력 (교리 모델 도입)</strong>: 이전 판의 표는 발사 시점이 <strong>탐지 시점에서 파생</strong>되던 모델로 산출했습니다.
+실제 체계는 <strong>대응 거리가 정해져 있어</strong> 일찍 탐지해도 일찍 쏘지 않으므로, 모델을
+<code>R_launch = min(R_commit, R_detect − v_t·t_react)</code>로 교체하고 전 표를 재산출했습니다.
+<strong>물리적 최적 교전 기하는 바뀌지 않았습니다</strong> — 이전 판의 &quot;최적 탐지거리 2.1 km&quot;는 발사점을
+2100 − 32.8×20 ≈ 1444 m로 만들던 것이고, 이번 판의 &quot;최적 발사 개시 거리 1.48 km&quot;와 같은 지점입니다
+(상한 44.6 / 54.7 / 63.1 / 66.0%도 이전 판과 동일). <strong>바뀐 것은 손잡이</strong>입니다: 그 운용점은 이제
+레이더를 깎아서가 아니라 <strong>교리(발사 개시 거리)로 직접</strong> 설정합니다.</p>
 </blockquote>
 <hr>
 <h2>S1. 표적 크기 민감도 (표적 크기 미정 → 결정 근거)</h2>
-<p>기본 시나리오(탐지 3km, σ=0.5°)에서 표적 임계 치수만 스윕:</p>
+<p>기본 시나리오(발사 개시 3 km, σ=0.5°)에서 표적 임계 치수만 스윕:</p>
 <table>
 <thead>
 <tr>
@@ -58,50 +67,54 @@ hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
 </thead>
 <tbody><tr>
 <td>0.20 m</td>
-<td>40%</td>
-<td>19.4%</td>
-<td>17.3%</td>
+<td>25%</td>
+<td>11.3%</td>
+<td>10.1%</td>
 <td>classify</td>
 </tr>
 <tr>
 <td>0.35 m(가정)</td>
-<td>84%</td>
-<td>41.0%</td>
-<td>36.5%</td>
+<td>68%</td>
+<td>31.1%</td>
+<td>27.8%</td>
 <td>classify</td>
 </tr>
 <tr>
 <td>0.50 m</td>
-<td>97%</td>
-<td>47.3%</td>
-<td>42.2%</td>
+<td>90%</td>
+<td>41.3%</td>
+<td>36.9%</td>
 <td>classify</td>
 </tr>
 <tr>
 <td>0.80 m</td>
-<td>100%</td>
-<td>48.9%</td>
-<td>43.6%</td>
+<td>99%</td>
+<td>45.4%</td>
+<td>40.5%</td>
 <td>classify</td>
 </tr>
 <tr>
 <td>1.20 m</td>
 <td>100%</td>
-<td>48.9%</td>
-<td>43.6%</td>
+<td>45.7%</td>
+<td>40.8%</td>
 <td>classify</td>
 </tr>
 </tbody></table>
 <p><strong>해석</strong></p>
 <ul>
-<li><strong>0.5 m 미만에서 매우 민감</strong> — 0.2 m면 P_negate 17%, 0.35 m면 37%. 소형 표적일수록 인식이 급락.</li>
-<li><strong>0.5 m 이상은 포화</strong> — 인식이 100%에 수렴하면 P_negate가 ~43.6%에서 평탄(이제 P_acq·대기투과가 상한).</li>
+<li><strong>0.5 m 미만에서 매우 민감</strong> — 0.2 m면 P_negate 10%, 0.35 m면 28%. 소형 표적일수록 인식이 급락.</li>
+<li><strong>0.8 m 이상은 포화</strong> — 인식이 100%에 수렴하면 P_negate가 ~40.8%에서 평탄(이제 P_acq·대기투과가 상한).</li>
+<li><strong>3 km 교리가 민감도를 증폭</strong>했습니다. 분류가 3.46 km에서 일어나 픽셀 예산이 빠듯하기 때문 —
+이전(2.8 km 분류) 대비 같은 표적 크기에서 인식이 크게 낮습니다. <strong>대응 거리를 멀리 잡을수록
+표적 크기 미확정 리스크가 커집니다.</strong></li>
 <li><strong>결정 시사점</strong>: 대상 기종이 <strong>소형(&lt;0.5 m)이면 표적 크기가 지배 변수</strong> → 값 확정이 결과를 크게 좌우.
-중형 이상이면 크기보다 EO 획득(지향)이 관건. → <strong>최악 케이스(소형)를 기준으로 설계</strong> 권장.</li>
+→ <strong>최악 케이스(소형)를 기준으로 설계</strong> 권장.</li>
 </ul>
 <h2>S2. 짐벌 없는 대안 — 최적 운용점과 정밀도 상한</h2>
-<p>짐벌 미도입 확정. 개선 레버는 **운용점(탐지/분류 거리)**과 <strong>달성 가능한 유도 정밀도 σ</strong>뿐.</p>
-<p><strong>(a) 근접 운용의 무료 이득</strong> — 현 정밀도(σ=0.5°)에서 탐지거리 운용점만 바꿔도:</p>
+<p>짐벌 미도입 확정. 개선 레버는 **발사 개시 거리(교리)**와 <strong>달성 가능한 유도 정밀도 σ</strong>뿐.
+(레이더 탐지 성능은 레버가 아닙니다 — 필요치 3.66 km를 넘으면 P_negate가 완전히 평평합니다. §S4)</p>
+<p><strong>(a) 발사 개시 거리 운용점</strong> — 현 정밀도(σ=0.5°)에서 교리만 바꿔도:</p>
 <table>
 <thead>
 <tr>
@@ -111,57 +124,71 @@ hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
 </thead>
 <tbody><tr>
 <td>기본 3.0 km</td>
-<td>36.5%</td>
+<td>27.8%</td>
 </tr>
 <tr>
-<td><strong>최적 ~2.1 km</strong></td>
-<td><strong>44.6% (+8.0%p)</strong></td>
+<td><strong>최적 ~1.48 km</strong></td>
+<td><strong>44.6% (+16.8%p)</strong></td>
 </tr>
 </tbody></table>
-<p>탐지거리를 2.1 km로 당기면 분류가 더 가까이서 일어나 인식↑ → <strong>하드웨어 변경 없이 +8%p</strong>.
-(단, 더 당기면 반응시간 부족으로 P_reach 하락 — 2.1 km가 최적.)</p>
-<p><strong>(b) P_negate 상한은 달성 가능 지향 σ가 결정</strong> (각 σ에서 탐지거리 최적화):</p>
+<p>가까이서 교전하면 분류가 가까이서 일어나 인식↑ → <strong>하드웨어 변경 없이 +16.8%p</strong>.
+(단, 1 km 아래로 더 당기면 요격점이 keep-out 500 m에 붙어 P_reach 하락 — 1.48 km가 내부 최적.)</p>
+<p>⚠ <strong>이건 &quot;1.5 km로 바꿔라&quot;는 권고가 아닙니다.</strong> P_negate는 무력화 여부만 셉니다. 3 km를 고르는 이유
+— 파편·낙하물 standoff, 2차 교전 기회, keep-out 여유 1312 m(vs 391 m) — 는 이 지표 바깥에 있습니다.
+이 표가 말하는 것은 <strong>&quot;3 km 교리의 가격표 = −16.8%p&quot;</strong> 이며, 지불 여부는 교리 판단입니다.</p>
+<p><strong>(b) P_negate 상한은 달성 가능 지향 σ가 결정</strong> (각 σ에서 발사 개시 거리 최적화):</p>
 <table>
 <thead>
 <tr>
 <th>유도 정밀도 σ</th>
-<th>최적 탐지거리</th>
+<th>최적 발사 개시 거리</th>
 <th>최대 P_negate</th>
+<th><strong>3 km 교리 유지 시</strong></th>
 </tr>
 </thead>
 <tbody><tr>
 <td>0.50°(현)</td>
-<td>2.1 km</td>
+<td>1.48 km</td>
 <td>44.6%</td>
+<td>27.8%</td>
 </tr>
 <tr>
 <td>0.40°</td>
-<td>2.1 km</td>
-<td>54.6%</td>
+<td>1.48 km</td>
+<td>54.7%</td>
+<td>34.0%</td>
 </tr>
 <tr>
 <td>0.30°</td>
-<td>2.1 km</td>
+<td>1.48 km</td>
 <td>63.1%</td>
+<td>39.3%</td>
 </tr>
 <tr>
 <td>0.20°</td>
-<td>2.1 km</td>
-<td>65.9%</td>
+<td>1.48 km</td>
+<td>66.0%</td>
+<td>41.1%</td>
 </tr>
 <tr>
 <td>0.15°</td>
-<td>2.1 km</td>
+<td>1.48 km</td>
 <td>66.0%</td>
+<td><strong>41.1% ← 상한</strong></td>
 </tr>
 </tbody></table>
 <p><strong>해석</strong></p>
 <ul>
-<li>짐벌 없이 현 정밀도로 <strong>현실적 상한 ≈ 45%</strong>(2.1 km 운용 시). 그 이상은 <strong>유도 정밀도</strong>에 달림.</li>
+<li>짐벌 없이 현 정밀도로 <strong>현실적 상한 ≈ 45%</strong>(1.48 km 운용 시). 그 이상은 <strong>유도 정밀도</strong>에 달림.</li>
 <li>σ를 0.3°까지 조이면 ~63%까지 가능하나, <strong>σ&lt;0.2°는 이득 포화</strong>(~66% — P_reach·P_kill 등이 상한).</li>
-<li><strong>요구사항</strong>: (1) 운용점 2.1 km 채택(즉시 +8%p), (2) 유도 정밀도 σ≤0.3° 확보가 목표 60%+의 관건.</li>
+<li>⚠ <strong>3 km 교리를 유지하면 지향 정밀도를 완벽하게 해도 41.1%가 천장</strong>입니다. 인식확률이 68.1%에
+묶여 있기 때문(3.46 km에서 표적 픽셀 7.4 px). <strong>3 km에서 40%+를 원하면 σ만으로는 불가능하고
+해상도·화각·표적크기 등 픽셀 예산을 함께 올려야 합니다.</strong></li>
+<li><strong>요구사항</strong>: (1) 발사 개시 거리를 <strong>효과도 대비 standoff 트레이드로 명시적으로 결정</strong>할 것,
+(2) 유도 정밀도 σ≤0.3° 확보, (3) 3 km 유지 시 <strong>픽셀 예산(해상도·화각) 재설계</strong> 병행.</li>
 </ul>
 <h2>S3. 위협 케이스별 효과도·병목</h2>
+<p>(기본값 = 커플링 0.5)</p>
 <table>
 <thead>
 <tr>
@@ -170,28 +197,36 @@ hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
 <th>병목</th>
 <th>인식</th>
 <th>탐지시점</th>
+<th>필요탐지</th>
+<th>탐지여유</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>소형 FPV(기본)</td>
-<td>36.5%</td>
+<td>23.3%</td>
 <td>classify</td>
-<td>84%</td>
-<td>2967 m</td>
+<td>68%</td>
+<td>3704 m</td>
+<td>3656 m</td>
+<td><strong>+48 m</strong></td>
 </tr>
 <tr>
 <td>고속 고정익</td>
-<td>40.0%</td>
+<td>39.2%</td>
 <td>classify</td>
 <td>100%</td>
-<td>4000 m</td>
+<td>5520 m</td>
+<td>4200 m</td>
+<td>+1320 m</td>
 </tr>
 <tr>
 <td>저피탐 초소형</td>
-<td>31.2%</td>
+<td>15.1%</td>
 <td>classify</td>
-<td>68%</td>
-<td>2356 m</td>
+<td>47%</td>
+<td>2948 m</td>
+<td>3560 m</td>
+<td><strong>−612 m ⚠</strong></td>
 </tr>
 <tr>
 <td>근거리 급습</td>
@@ -199,35 +234,92 @@ hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
 <td><strong>reach</strong></td>
 <td>100%</td>
 <td>1500 m</td>
+<td>3800 m</td>
+<td><strong>−2300 m ⚠</strong></td>
 </tr>
 <tr>
 <td>안개 · 저시정</td>
 <td><strong>0.0%</strong></td>
 <td>classify</td>
-<td>84%</td>
-<td>2967 m</td>
+<td>68%</td>
+<td>3704 m</td>
+<td>3656 m</td>
+<td>+48 m</td>
 </tr>
 <tr>
 <td>야간 · EO 저하</td>
-<td>5.9%</td>
+<td>2.9%</td>
 <td>classify</td>
-<td>84%</td>
-<td>2967 m</td>
+<td>68%</td>
+<td>3704 m</td>
+<td>3656 m</td>
+<td>+48 m</td>
 </tr>
 </tbody></table>
 <p><strong>해석 — 병목은 위협/환경마다 다름</strong></p>
 <ul>
 <li>대부분 **classify(EO)**가 병목 → EO 획득·인식이 체계의 핵심 취약점.</li>
-<li><strong>근거리 급습은 reach(도달)</strong> — 짧은 진입거리로 반응시간 부족. 대응은 탐지 조기화·반응예산 단축.</li>
-<li><strong>안개에서 P_negate 0%, 야간 6%</strong> — EO 의존 체계의 치명적 한계. <strong>저시정/야간 대안</strong>(IR 대역·근접 교전·
+<li><strong>기본 시나리오의 탐지 여유가 +48 m(1.5초)뿐</strong> — 3 km 교리를 간신히 충족. 표적 RCS가 조금만
+작아지거나 반응 예산이 조금만 늘어도 탐지 제약으로 넘어갑니다. <strong>강건성 관점에서 가장 시급한 수치.</strong></li>
+<li><strong>저피탐 초소형·근거리 급습은 탐지 제약(⚠)</strong> — 3 km 교리를 못 지키고 안쪽에서 교전.
+근거리 급습은 그 결과 <strong>reach가 무너집니다</strong>(요격점이 keep-out 침범).</li>
+<li><strong>안개에서 P_negate 0%, 야간 3%</strong> — EO 의존 체계의 치명적 한계. <strong>저시정/야간 대안</strong>(IR 대역·근접 교전·
 대체 센서)이 없으면 악천후 시 사실상 무력. → <strong>운용 요구사항으로 명시 필요</strong>.</li>
+</ul>
+<h2>S4. 레이더 탐지 성능은 레버가 아니다 (교리 지배 구간)</h2>
+<p>발사 개시 3 km 고정, 레이더 기준 탐지거리만 스윕(커플링 0):</p>
+<table>
+<thead>
+<tr>
+<th>기준 탐지거리 (Pd 0.9)</th>
+<th>탐지 여유</th>
+<th>P_negate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1.5 km</td>
+<td>−1461 m ⚠</td>
+<td>44.5%</td>
+</tr>
+<tr>
+<td>2.5 km</td>
+<td>−444 m ⚠</td>
+<td>33.4%</td>
+</tr>
+<tr>
+<td><strong>3.0 km(기본)</strong></td>
+<td><strong>+48 m</strong></td>
+<td><strong>27.8%</strong></td>
+</tr>
+<tr>
+<td>4.0 km</td>
+<td>+1032 m</td>
+<td>27.8%</td>
+</tr>
+<tr>
+<td>5.0 km</td>
+<td>+2049 m</td>
+<td>27.8%</td>
+</tr>
+</tbody></table>
+<ul>
+<li><strong>필요치(3.66 km)를 넘으면 완전히 평평</strong> — 탐지 성능은 <strong>여유(강건성)를 사는 것</strong>이지 효과도를 사는 게 아닙니다.</li>
+<li>필요치 아래에서 P_negate가 <strong>올라가 보이는 것은 착시</strong>입니다. 늦은 탐지가 교전을 안쪽으로 끌어당겨
+EO를 도와주는 것뿐이고, 이는 <strong>3 km 교리가 P_negate 기준으로 최적이 아니라는 신호</strong>(§S2a)이지
+&quot;레이더를 나쁘게 사라&quot;는 뜻이 아닙니다. 이 구간에서는 <strong>P_reach가 무너집니다</strong>(1.2 km에서 89.5%).</li>
+<li><strong>요구사항</strong>: 탐지는 <strong>3.66 km 확보</strong>가 사양이고, 그 이상은 강건성 마진 투자로 분류할 것.</li>
 </ul>
 <hr>
 <h2>종합 결론 (요구사항)</h2>
 <ol>
-<li><strong>표적 크기 확정이 시급</strong> — 특히 소형(&lt;0.5 m) 가정 시 결과 지배. 최악 케이스로 설계.</li>
-<li><strong>짐벌 없이 즉시 개선</strong>: 운용점 2.1 km 채택(+8%p). 그 위 상한은 <strong>유도 정밀도 σ</strong>가 결정(σ≤0.3° → ~63%).</li>
-<li><strong>악천후 취약</strong>: 안개·야간에서 EO 붕괴(0~6%). 대체 수단이 핵심 미해결 요구사항.</li>
+<li><strong>표적 크기 확정이 시급</strong> — 특히 소형(&lt;0.5 m) 가정 시 결과 지배. 최악 케이스로 설계.
+3 km 교리가 이 민감도를 증폭시킴.</li>
+<li><strong>발사 개시 거리를 명시적 트레이드로 결정</strong> — 3 km는 최적점(1.48 km) 대비 −16.8%p를 지불하는 선택.
+standoff·2차 교전 기회와 맞바꾸는 것이며, 결정 근거를 문서화해야 함.</li>
+<li><strong>3 km 유지 시 EO 재설계 필요</strong> — 지향 σ를 완벽히 해도 41.1%가 천장(픽셀 부족).
+σ≤0.3° + 픽셀 예산(해상도·화각) 상향을 함께 가야 60%+ 가능.</li>
+<li><strong>탐지는 3.66 km면 충분</strong> — 그 이상은 효과도가 아니라 마진. 현 여유 +48 m는 위태로움.</li>
+<li><strong>악천후 취약</strong>: 안개·야간에서 EO 붕괴(0~3%). 대체 수단이 핵심 미해결 요구사항.</li>
 </ol>
 <p><em>방법: 각 표는 도구의 스윕/역산으로 산출. 값은 가정 기반이므로 절대값보다 경향·임계·상한을 볼 것.</em></p>
 

@@ -164,6 +164,13 @@ export interface CsvImportResult {
   scenario: Scenario
   applied: number
   unknownKeys: string[]
+  /**
+   * Values that parsed as numbers but fall outside the parameter's valid range.
+   * They ARE applied (so the user sees their own file reflected back and can fix
+   * it in the panel) but are reported so the import never looks clean when it
+   * isn't. Excel round-trips are exactly where "0.9" becomes "90" silently.
+   */
+  outOfRange: Array<{ key: string; label: string; value: number; min: number; max: number }>
 }
 
 /**
@@ -176,6 +183,7 @@ export function applyCsv(base: Scenario, text: string): CsvImportResult {
   let scenario = base
   let applied = 0
   const unknownKeys: string[] = []
+  const outOfRange: CsvImportResult['outOfRange'] = []
 
   for (const rec of records) {
     if (rec.length < 4) continue
@@ -214,10 +222,13 @@ export function applyCsv(base: Scenario, text: string): CsvImportResult {
     }
     const v = parseFloat(rawVal)
     if (Number.isFinite(v)) {
+      if (v < info.range.min || v > info.range.max) {
+        outOfRange.push({ key, label: info.label, value: v, min: info.range.min, max: info.range.max })
+      }
       scenario = info.set(scenario, v)
       applied++
     }
   }
 
-  return { scenario, applied, unknownKeys }
+  return { scenario, applied, unknownKeys, outOfRange }
 }

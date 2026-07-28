@@ -96,23 +96,36 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
   },
   'sensor.ref_detection_range_m': {
     theory: `${REF_RADAR}: 기준 RCS₀에서의 탐지거리(곡선 위치).`,
-    formula: 'R₀ = 기준 RCS₀ 표적의 탐지거리',
-    detail: '이 거리에서 단일 스캔 탐지확률이 최대치의 절반(P_max/2)이 되고, 안쪽은 P_max로 포화, 바깥은 0으로 떨어집니다.',
+    assumption:
+      '직관 입력값 — "이 거리에서 Pd 얼마로 탐지"의 거리 쪽. 내부 로지스틱 중심 R_half는 이 값이 아니라 아래 식으로 역산됩니다.',
+    formula: 'R_half = R_q − w · ln(P_max/p_q − 1)\n(R_q = 기준 탐지거리, p_q = 탐지거리 Pd)',
+    detail:
+      '데이터시트가 주는 형태 그대로 넣는 값입니다. ⚠ 이 값은 Pd 50% 지점이 아닙니다 — "Pd 0.9 @ 3 km"라면 곡선 중심은 3 km가 아니라 3.7 km(기본값 기준)로 역산됩니다. 예전처럼 인용 거리를 곡선 중심으로 쓰면 실제보다 나쁜 레이더를 모델링하게 됩니다.',
+    diagram: 'pd-logistic',
+  },
+  'sensor.pd_at_ref': {
+    theory: `${REF_RADAR}: 사양서의 탐지거리는 항상 특정 Pd·Pfa 조건에서 인용됨(관례 Pd 0.8~0.9 @ Pfa 1e-6).`,
+    assumption: '단일 스캔 기준(누적 아님). P_max보다 작아야 하며 초과 시 P_max 바로 아래로 클램프.',
+    formula: 'p_q = P_max / (1 + e^((R_q − R_half)/w))\n⇒ R_half = R_q − w · ln(P_max/p_q − 1)',
+    detail:
+      '"탐지거리"라는 말은 그 거리에서의 탐지확률을 함께 말해야 의미가 생깁니다. 이 값을 낮추면 같은 인용 거리라도 더 좋은 레이더가 됩니다(같은 거리에서 요구 확률이 낮으므로 곡선 중심이 더 멀어짐).',
     diagram: 'pd-logistic',
   },
   'sensor.pd_max': {
     theory: '탐지확률은 SNR의 함수(Marcum Q). 근거리 SNR 충분 시 상한.',
-    assumption: '거리 롤오프를 로지스틱으로 근사(실제 ROC 아님).',
-    formula: 'P_d(r ≪ R_det) → P_max',
-    detail: '표적이 충분히 가까울 때의 단일 스캔 탐지확률 상한. 로지스틱 곡선의 천장 높이입니다.',
+    assumption: '거리 롤오프를 로지스틱으로 근사(실제 ROC 아님). 사양값이 아닌 곡선 형태 가정.',
+    formula: 'P_d(r ≪ R_half) → P_max',
+    detail:
+      '[고급·곡선 형태] 표적이 충분히 가까울 때의 단일 스캔 탐지확률 상한 = 로지스틱 천장. 직접 만지는 값이 아니라, 기준 탐지거리·탐지거리 Pd에서 곡선 중심을 역산할 때 쓰이는 기준 천장입니다.',
     diagram: 'pd-logistic',
   },
   'sensor.pd_transition_width_m': {
     theory: '탐지확률의 거리 경계 롤오프.',
-    assumption: '로지스틱(시그모이드) 근사 — 실제로는 SNR–거리 ROC로 산출해야 함.',
-    formula: 'P_d(r) = P_max / (1 + e^((r − R_det)/w))\nw = 전이 폭',
+    assumption:
+      '로지스틱(시그모이드) 근사 — 실제로는 SNR–거리 ROC로 산출해야 함. RCS 스케일 시 곡선은 평행이동만 하고 w는 고정(형태 보존 가정).',
+    formula: 'P_d(r) = P_max / (1 + e^((r − R_half)/w))\nw = 전이 폭',
     detail:
-      '탐지거리 경계에서 확률이 떨어지는 "부드러움"의 폭입니다. w가 작으면 R_det에서 낭떠러지처럼 뚝 끊기고, w가 크면 완만하게 감소합니다. r = R_det±w에서 P_d는 최대치의 약 27%/73%. 회색 띠가 ±w 구간입니다.',
+      '[고급·곡선 형태] 확률이 떨어지는 "부드러움"의 폭입니다. w가 작으면 낭떠러지처럼 뚝 끊기고, 크면 완만하게 감소합니다. r = R_half±w에서 P_d는 최대치의 약 27%/73%. 기준 탐지거리·Pd에서 중심을 역산할 때도 이 폭이 쓰이므로, w를 바꾸면 곡선 중심도 함께 이동합니다.',
     diagram: 'pd-logistic',
   },
   'sensor.revisit_time_s': {
@@ -123,9 +136,13 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
     diagram: 'cumulative-pd',
   },
   'sensor.classify_time_s': {
-    theory: `${REF_KINE}: 반응 예산에 합산 → 발사 시점 위협 거리 결정.`,
-    formula: 't_react = t_classify + t_decision + t_launch',
-    detail: '최초 탐지 후 적대 분류/확인 시간. 이 시간만큼 위협이 더 접근한 뒤 발사가 시작됩니다.',
+    theory: `${REF_KINE}: 반응 예산에 합산 → 필요 탐지거리 결정.`,
+    assumption:
+      '교리(발사 개시 거리) 도입 후 역할 변경: 분류 "소요 시간"이자 필요 탐지거리의 구성요소. 분류 완료 거리 자체는 발사 시점에서 역산(가능한 한 늦게=가깝게).',
+    formula:
+      't_react = t_classify + t_decision + t_launch\n필요 탐지거리 = R_commit + v_t · t_react',
+    detail:
+      '최초 탐지 후 적대 분류/확인에 걸리는 최소 시간. 이 값이 길수록 같은 발사 개시 거리를 지키기 위해 더 먼 탐지가 필요해집니다. 탐지가 충분하면 분류 완료 거리는 이 값이 아니라 발사 시점에서 역산되며, 탐지가 부족할 때만 분류가 탐지 직후로 밀려 거리가 멀어집니다.',
     diagram: 'closing-geometry',
   },
   'sensor.classify_prob': {
@@ -204,6 +221,16 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
     theory: `${REF_KINE}: 접근속도 v_i+v_t, 회합 시각으로 요격거리 산출.`,
     formula: 't_meet = gap / (v_i + v_t)\nR_int = R_pad + v_i · t_meet',
     detail: '요격기가 빠를수록 접근속도가 커져 더 먼(자산 바깥) 거리에서 위협을 만납니다 → 요격 거리 여유↑.',
+    diagram: 'closing-geometry',
+  },
+  'effector.commit_range_m': {
+    theory: `${REF_KINE}: 교전은 교리(대응 거리)로 개시되며 탐지 시점으로 개시되지 않음.`,
+    assumption:
+      '위협이 이 거리에 도달하면 발사. 탐지가 늦어 반응 예산이 안 들어가면 그때만 "가능한 즉시" 발사로 후퇴. 분류 완료 거리도 이 발사 시점에서 역산.',
+    formula:
+      'R_launch = min(R_commit, R_detect − v_t · t_react)\n필요 탐지거리 = R_commit + v_t · t_react\n분류 완료 거리 = R_launch + v_t · (t_decision + t_launch)',
+    detail:
+      '체계가 실제로 교전을 시작하는 거리입니다. 이 값을 도입하기 전 모델은 "탐지 즉시 반응"이라, 탐지 성능을 올리면 더 멀리서 분류하게 되어 오히려 P_negate가 떨어지는 비직관적 거동이 있었습니다. 이제 탐지거리를 필요치 이상으로 올려도 성능은 평평하고(여유만 증가), 필요치 아래로 내려가면 급락합니다. 반대로 이 값을 키우면 EO가 더 먼 거리에서 인식해야 해서 분류가 어려워집니다 — 대응 거리와 EO 요구성능의 트레이드가 여기서 드러납니다.',
     diagram: 'closing-geometry',
   },
   'effector.max_engagement_range_m': {

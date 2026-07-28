@@ -8,6 +8,7 @@ import {
   reportToMarkdown,
   scenarioToCsvFile,
   applyCsv,
+  validateScenario,
   type Scenario,
 } from '../../analysis'
 import AnalysisPanel from './AnalysisPanel'
@@ -21,6 +22,15 @@ import CompareView from './CompareView'
 import ParamExplainModal from './ParamExplainModal'
 import { downloadText, fileStamp } from './download'
 import './analysis.css'
+
+/**
+ * Monte Carlo trial bounds. The run is synchronous inside a useMemo, so the
+ * upper bound is a UI-responsiveness guard, not a modelling limit: ~20 µs per
+ * trial ⇒ 200k ≈ 4 s of blocked render. Below MIN_TRIALS the CI is so wide the
+ * answer says nothing.
+ */
+const MIN_TRIALS = 100
+const MAX_TRIALS = 200000
 
 interface Props {
   onExit: () => void
@@ -53,7 +63,11 @@ export default function AnalysisView({ onExit }: Props) {
   const [scenario, setScenario] = useState<Scenario>(() => defaultScenario())
   const [type, setType] = useState<AnalysisType>('engagement')
   const [fidelity, setFidelity] = useState<Fidelity>('analytical')
-  const [trials, setTrials] = useState(3000)
+  // 10k trials ⇒ 95% CI ≈ ±0.8%p at ~200 ms, vs ±1.5%p at 3k. The tool is used
+  // to compare scenarios that differ by a few %p, so 3k left real differences
+  // buried in sampling noise. MAX_TRIALS exists because the run is synchronous
+  // on the render thread — a mistyped 1e6 would freeze the UI for ~20 s.
+  const [trials, setTrials] = useState(10000)
   const [seed, setSeed] = useState(2026)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [explainKey, setExplainKey] = useState<string | null>(null)
@@ -93,9 +107,23 @@ export default function AnalysisView({ onExit }: Props) {
     const text = await file.text()
     const res = applyCsv(defaultScenario(), text)
     setScenario(res.scenario)
+    const notes: string[] = []
     if (res.unknownKeys.length > 0) {
+      notes.push(`인식 못한 key ${res.unknownKeys.length}개: ${res.unknownKeys.slice(0, 5).join(', ')}`)
+    }
+    if (res.outOfRange.length > 0) {
+      // Applied anyway so the panel shows the user their own file — but never silently.
+      notes.push(
+        `유효 범위를 벗어난 값 ${res.outOfRange.length}개 (적용은 되었으나 결과가 무의미할 수 있음):\n` +
+          res.outOfRange
+            .slice(0, 6)
+            .map((o) => `  · ${o.label} = ${o.value} (허용 ${o.min}~${o.max})`)
+            .join('\n'),
+      )
+    }
+    if (notes.length > 0) {
       // eslint-disable-next-line no-alert
-      alert(`불러오기 완료: ${res.applied}개 적용.\n인식 못한 key ${res.unknownKeys.length}개: ${res.unknownKeys.slice(0, 5).join(', ')}`)
+      alert(`불러오기 완료: ${res.applied}개 적용.\n\n${notes.join('\n\n')}`)
     }
     ev.target.value = '' // allow re-importing the same file
   }
@@ -182,14 +210,19 @@ export default function AnalysisView({ onExit }: Props) {
               </div>
               {fidelity === 'montecarlo' && (
                 <div className="an-mc-controls">
-                  <label>
+                  <label title={`${MIN_TRIALS}~${MAX_TRIALS.toLocaleString()} 회. 동기 실행이라 시행수가 클수록 화면이 잠깐 멈춥니다 (10,000회 ≈ 0.2초).`}>
                     시행수
                     <input
                       type="number"
-                      min={100}
-                      step={500}
+                      min={MIN_TRIALS}
+                      max={MAX_TRIALS}
+                      step={1000}
                       value={trials}
-                      onChange={(e) => setTrials(Math.max(100, parseInt(e.target.value) || 100))}
+                      onChange={(e) =>
+                        setTrials(
+                          Math.min(MAX_TRIALS, Math.max(MIN_TRIALS, parseInt(e.target.value) || MIN_TRIALS)),
+                        )
+                      }
                     />
                   </label>
                   <label>
@@ -204,6 +237,31 @@ export default function AnalysisView({ onExit }: Props) {
               )}
             </div>
           )}
+
+          {/* Never let a result render as if it were sound when the inputs are not.
+              The left panel lists the specifics; this is the "don't trust this number" flag. */}
+          {(() => {
+            const errs = validateScenario(scenario).filter((i) => i.severity === 'error')
+            if (errs.length === 0) return null
+            return (
+              <div className="an-validation is-error">
+                <div className="an-validation-head">
+                  <span className="an-validation-tag">✕ 입력 오류 {errs.length}개</span>
+                  <span className="ab-small">
+                    아래 결과는 모델이 값을 강제로 클램프한 상태에서 계산된 것이라 신뢰할 수 없습니다 —
+                    좌측 패널에서 먼저 수정하세요.
+                  </span>
+                </div>
+                <ul className="an-validation-list">
+                  {errs.slice(0, 4).map((i) => (
+                    <li key={`${i.key}:${i.message}`} className="is-error">
+                      <b>{i.label}</b> — {i.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })()}
 
           {type === 'engagement' &&
             (fidelity === 'analytical' || !mcResult ? (

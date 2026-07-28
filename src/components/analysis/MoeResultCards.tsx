@@ -114,10 +114,22 @@ export default function MoeResultCards({ result }: Props) {
       {/* Kinematics / geometry readout */}
       <div className="an-card">
         <div className="ab-label">교전 기하 · 타임라인</div>
+        <div className="an-gate-note ab-small">
+          {reach.detection_limited
+            ? '⚠ 탐지 제약 — 탐지가 늦어 교리상 발사 개시 거리를 지키지 못하고 "가능한 즉시" 발사로 후퇴.'
+            : '교리 지배 — 발사 개시 거리에서 정상 교전. 탐지 여유는 남는 마진일 뿐 성능을 더 올리지 않음.'}
+        </div>
         <dl className="an-readout">
-          <div><dt>탐지 거리 (nominal)</dt><dd>{detection.nominal_range_m.toFixed(0)} m</dd></div>
+          <div><dt>탐지 거리 (사양 Pd 기준)</dt><dd>{detection.quoted_range_m.toFixed(0)} m</dd></div>
+          <div><dt>Pd 50% 거리 (곡선 중심)</dt><dd>{detection.nominal_range_m.toFixed(0)} m</dd></div>
           <div><dt>탐지 시점 거리</dt><dd>{detection.detect_at_range_m.toFixed(0)} m</dd></div>
+          <div><dt>필요 탐지거리 (교리 충족)</dt><dd>{reach.required_detection_range_m.toFixed(0)} m</dd></div>
+          <div className={reach.detection_limited ? 'bad' : 'ok'}>
+            <dt>탐지 여유</dt>
+            <dd>{reach.detection_margin_m.toFixed(0)} m · {reach.detection_margin_s.toFixed(1)} s</dd>
+          </div>
           <div><dt>반응 예산 (분류+결심+발사)</dt><dd>{reach.budget.react_total_s.toFixed(1)} s</dd></div>
+          <div><dt>발사 개시 거리 (교리)</dt><dd>{reach.commit_range_m.toFixed(0)} m</dd></div>
           <div><dt>발사 시 위협 거리</dt><dd>{reach.threat_range_at_launch_m.toFixed(0)} m</dd></div>
           <div><dt>요격까지 시간</dt><dd>{reach.time_to_meet_s.toFixed(1)} s</dd></div>
           <div><dt>요격 거리 (자산 기준)</dt><dd>{reach.intercept_range_m.toFixed(0)} m</dd></div>

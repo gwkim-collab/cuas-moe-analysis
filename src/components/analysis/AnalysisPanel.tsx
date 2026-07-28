@@ -1,4 +1,12 @@
-import { focalLengthMm, paramInfo, type Scenario, type DiscriminationLevel } from '../../analysis'
+import {
+  focalLengthMm,
+  paramInfo,
+  pdHalfPointRange,
+  validateScenario,
+  autoFixScenario,
+  type Scenario,
+  type DiscriminationLevel,
+} from '../../analysis'
 import type { PayloadMode } from '../../types'
 import ScenarioBar from './ScenarioBar'
 
@@ -42,12 +50,26 @@ function NumField({
   dim?: boolean
 }) {
   const hint = hintFor(paramKey)
+  const info = paramInfo(paramKey)
+  // Out-of-range is flagged, never silently corrected: clamping mid-typing
+  // fights the user, and a wrong value the model quietly absorbs is worse
+  // than a visible red field. The banner below the group lists every issue.
+  const bad =
+    info != null &&
+    (!Number.isFinite(value) ||
+      value < info.range.min ||
+      value > info.range.max ||
+      (info.integer === true && !Number.isInteger(value)))
   return (
-    <label className={`an-field ${active ? 'is-active-opt' : ''} ${dim ? 'is-dim-opt' : ''}`} title={hint}>
+    <label
+      className={`an-field ${active ? 'is-active-opt' : ''} ${dim ? 'is-dim-opt' : ''} ${bad ? 'is-invalid' : ''}`}
+      title={hint}
+    >
       <span className="an-field-label">
         {label}
         {unit ? <em className="an-field-unit"> · {unit}</em> : null}
         {active ? <span className="an-opt-badge">활성</span> : null}
+        {bad ? <span className="an-bad-badge" title={`유효 범위 ${info.range.min} ~ ${info.range.max}`}>범위 밖</span> : null}
         {onExplain ? (
           <button
             type="button"
@@ -68,7 +90,10 @@ function NumField({
       <input
         type="number"
         value={Number.isFinite(value) ? value : 0}
-        step={step ?? 'any'}
+        step={step ?? (info?.integer ? 1 : 'any')}
+        min={info?.range.min}
+        max={info?.range.max}
+        aria-invalid={bad || undefined}
         onChange={(e) => {
           const v = parseFloat(e.target.value)
           onChange(Number.isFinite(v) ? v : 0)
@@ -110,6 +135,35 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
 
       <ScenarioBar scenario={scenario} onLoad={onChange} />
 
+      {(() => {
+        const issues = validateScenario(scenario)
+        if (issues.length === 0) return null
+        const errors = issues.filter((i) => i.severity === 'error')
+        return (
+          <div className={`an-validation ${errors.length > 0 ? 'is-error' : 'is-warn'}`}>
+            <div className="an-validation-head">
+              <span className="an-validation-tag">{errors.length > 0 ? '✕ 입력 오류' : '⚠ 입력 경고'}</span>
+              <span className="ab-small">
+                {errors.length > 0
+                  ? `${errors.length}개 — 결과가 무의미할 수 있습니다`
+                  : `${issues.length}개 — 계산은 되지만 의도와 다를 수 있습니다`}
+              </span>
+              {errors.length > 0 && (
+                <button type="button" className="an-btn-ghost" onClick={() => onChange(autoFixScenario(scenario))}>
+                  ↺ 범위로 자동 수정
+                </button>
+              )}
+            </div>
+            <ul className="an-validation-list">
+              {issues.map((i) => (
+                <li key={`${i.key}:${i.message}`} className={i.severity === 'error' ? 'is-error' : 'is-warn'}>
+                  <b>{i.label}</b> — {i.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })()}
 
       <fieldset className="an-group">
         <legend>위협 · THREAT</legend>
@@ -125,11 +179,19 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <legend>레이더 · SENSOR</legend>
         <NumField label="기준 RCS" unit="m²" value={s.ref_rcs_m2} step={0.001} paramKey="sensor.ref_rcs_m2" onExplain={onExplain} onChange={(v) => setSensor({ ref_rcs_m2: v })} />
         <NumField label="기준 탐지거리" unit="m" value={s.ref_detection_range_m} paramKey="sensor.ref_detection_range_m" onExplain={onExplain} onChange={(v) => setSensor({ ref_detection_range_m: v })} />
-        <NumField label="최대 Pd" value={s.pd_max} step={0.01} paramKey="sensor.pd_max" onExplain={onExplain} onChange={(v) => setSensor({ pd_max: v })} />
-        <NumField label="전이 폭" unit="m" value={s.pd_transition_width_m} paramKey="sensor.pd_transition_width_m" onExplain={onExplain} onChange={(v) => setSensor({ pd_transition_width_m: v })} />
+        <NumField label="탐지거리 Pd" value={s.pd_at_ref} step={0.01} paramKey="sensor.pd_at_ref" onExplain={onExplain} onChange={(v) => setSensor({ pd_at_ref: v })} />
+        <p className="an-field-note ab-small" style={{ opacity: 0.7 }}>
+          위 두 값이 레이더 정의: <b>"{s.ref_rcs_m2} m²를 {(s.ref_detection_range_m / 1000).toFixed(1)} km에서 Pd {s.pd_at_ref}로 탐지"</b>.
+          내부 곡선 중심(Pd 50%)은 {pdHalfPointRange(s).toFixed(0)} m로 역산됩니다.
+        </p>
         <NumField label="재방문 주기" unit="s" value={s.revisit_time_s} step={0.1} paramKey="sensor.revisit_time_s" onExplain={onExplain} onChange={(v) => setSensor({ revisit_time_s: v })} />
         <NumField label="분류 시간" unit="s" value={s.classify_time_s} step={0.5} paramKey="sensor.classify_time_s" onExplain={onExplain} onChange={(v) => setSensor({ classify_time_s: v })} />
         <NumField label="분류기 상한" value={s.classify_prob} step={0.01} paramKey="sensor.classify_prob" onExplain={onExplain} onChange={(v) => setSensor({ classify_prob: v })} />
+        <details className="an-advanced">
+          <summary className="ab-small">고급 · Pd 곡선 형태 (보통 만지지 않음)</summary>
+          <NumField label="최대 Pd" value={s.pd_max} step={0.01} paramKey="sensor.pd_max" onExplain={onExplain} onChange={(v) => setSensor({ pd_max: v })} />
+          <NumField label="전이 폭" unit="m" value={s.pd_transition_width_m} paramKey="sensor.pd_transition_width_m" onExplain={onExplain} onChange={(v) => setSensor({ pd_transition_width_m: v })} />
+        </details>
       </fieldset>
 
       <fieldset className="an-group">
@@ -175,6 +237,10 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         </label>
         <NumField label="발사 지연" unit="s" value={e.launch_delay_s} step={0.5} paramKey="effector.launch_delay_s" onExplain={onExplain} onChange={(v) => setEffector({ launch_delay_s: v })} />
         <NumField label="순항 속도" unit="m/s" value={e.cruise_speed_m_s} paramKey="effector.cruise_speed_m_s" onExplain={onExplain} onChange={(v) => setEffector({ cruise_speed_m_s: v })} />
+        <NumField label="발사 개시 거리 (교리)" unit="m" value={e.commit_range_m} paramKey="effector.commit_range_m" onExplain={onExplain} onChange={(v) => setEffector({ commit_range_m: v })} />
+        <p className="an-field-note ab-small" style={{ opacity: 0.7 }}>
+          이 거리에서 발사합니다. 일찍 탐지해도 더 일찍 쏘지 않고 <b>여유</b>만 늘어납니다 — 탐지가 늦을 때만 구속.
+        </p>
         <NumField label="요격기 도달 반경" unit="m" value={e.max_engagement_range_m} paramKey="effector.max_engagement_range_m" onExplain={onExplain} onChange={(v) => setEffector({ max_engagement_range_m: v })} />
         <NumField label="발사대 거리" unit="m" value={e.launch_pad_range_from_asset_m} paramKey="effector.launch_pad_range_from_asset_m" onExplain={onExplain} onChange={(v) => setEffector({ launch_pad_range_from_asset_m: v })} />
         <NumField label="단발 Pk · net" value={e.single_shot_pk_net} step={0.01} paramKey="effector.single_shot_pk_net" onExplain={onExplain} onChange={(v) => setEffector({ single_shot_pk_net: v })} active={e.payload === 'net_gun'} dim={e.payload !== 'net_gun'} />

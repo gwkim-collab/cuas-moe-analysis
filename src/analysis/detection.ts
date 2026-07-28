@@ -8,9 +8,17 @@
 //
 // Single-look detection probability is modelled as a logistic that
 // is ~pd_max well inside range and rolls off through 0.5·pd_max at
-// the nominal detection range. Cumulative detection over the inbound
-// track combines independent looks at the scan revisit rate:
+// the curve's CENTRE. Cumulative detection over the inbound track
+// combines independent looks at the scan revisit rate:
 //   P_det = 1 − Π(1 − pd_i).
+//
+// INTUITIVE INPUT ⇄ INTERNAL PARAMETER
+// The user states the pair a datasheet actually gives — "RCS₀ 표적을
+// R_q에서 Pd = p_q로 탐지" — and the logistic centre is inverted out
+// of it (pdHalfPointRange). The centre is NOT the quoted range: the
+// quoted range is where Pd = p_q, the centre is where Pd = pd_max/2.
+// Feeding a quoted "Pd 0.9 @ 3 km" straight in as the centre would
+// silently model a much worse radar (Pd 0.49 at 3 km).
 //
 // These are open-literature approximations, not a calibrated radar
 // model. See model.ts SME-VERIFY tags.
@@ -19,10 +27,41 @@
 import type { SensorSpec, ThreatSpec } from './model'
 import { clamp, slantRange } from './geometry'
 
-/** Nominal detection range (m) for a target of the given RCS. */
+/**
+ * Logistic centre (m) for the REFERENCE RCS — the range where a single look
+ * gives pd_max/2 — inverted from the intuitive pair (quoted range, Pd there):
+ *
+ *   p_q = pd_max / (1 + exp((R_q − R_half)/w))
+ *   ⇒ R_half = R_q + w · ln(pd_max/p_q − 1)⁻¹ = R_q − w · ln(pd_max/p_q − 1)
+ *
+ * p_q is clamped below pd_max (the ceiling is unreachable by construction).
+ */
+export function pdHalfPointRange(sensor: SensorSpec): number {
+  const ceiling = clamp(sensor.pd_max, 1e-6, 1)
+  const pq = clamp(sensor.pd_at_ref, 1e-6, ceiling * 0.999)
+  return sensor.ref_detection_range_m - sensor.pd_transition_width_m * Math.log(ceiling / pq - 1)
+}
+
+/**
+ * Logistic centre (m) for an arbitrary RCS. The radar equation scales the whole
+ * curve by (rcs/ref)^¼; the transition width `w` is held fixed (the curve
+ * translates, its shape is preserved) — a modelling simplification.
+ */
 export function detectionRangeForRcs(sensor: SensorSpec, rcs_m2: number): number {
   const ratio = rcs_m2 / sensor.ref_rcs_m2
-  return sensor.ref_detection_range_m * Math.pow(Math.max(ratio, 1e-9), 0.25)
+  return pdHalfPointRange(sensor) * Math.pow(Math.max(ratio, 1e-9), 0.25)
+}
+
+/**
+ * Range (m) at which a single look on the given RCS reaches probability `p` —
+ * the inverse of `pdAtRange`, and the exact inverse of `pdHalfPointRange`:
+ *   p = P_max/(1 + e^((R − R_half)/w))  ⇒  R = R_half + w·ln(P_max/p − 1)
+ * So rangeForPd(sensor, ref_rcs, pd_at_ref) === ref_detection_range_m.
+ */
+export function rangeForPd(sensor: SensorSpec, rcs_m2: number, p: number): number {
+  const ceiling = clamp(sensor.pd_max, 1e-6, 1)
+  const target = clamp(p, 1e-6, ceiling * 0.999)
+  return detectionRangeForRcs(sensor, rcs_m2) + sensor.pd_transition_width_m * Math.log(ceiling / target - 1)
 }
 
 /** Single-look detection probability at a given range for the given RCS. */
@@ -39,8 +78,14 @@ export function pdAtRange(
 }
 
 export interface DetectionResult {
-  /** Nominal detection range for the threat RCS (m). */
+  /** Logistic centre for the threat RCS (m) — where a single look gives pd_max/2. */
   nominal_range_m: number
+  /**
+   * The intuitive detection range for the threat RCS (m): where a single look
+   * reaches `sensor.pd_at_ref`. Equals `ref_detection_range_m` when the threat
+   * RCS equals the reference RCS. This is the number to quote to a human.
+   */
+  quoted_range_m: number
   /** Cumulative probability of detection over the whole inbound track (0..1). */
   cumulative_pd: number
   /**
@@ -87,6 +132,7 @@ export function computeDetection(
 
   return {
     nominal_range_m: nominal,
+    quoted_range_m: rangeForPd(sensor, threat.rcs_m2, sensor.pd_at_ref),
     cumulative_pd: clamp(1 - survivalMiss, 0, 1),
     detect_at_range_m: detectAt,
   }

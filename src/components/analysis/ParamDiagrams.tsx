@@ -43,6 +43,7 @@ const BAND = 'rgba(49,208,170,0.14)'
 const TXT = 'rgba(210,224,220,0.9)'
 const TXT_DIM = 'rgba(159,180,173,0.7)'
 const WARN = '#ff6b6b'
+const ACCENT = '#ffb020' // doctrinal markers (commit range) — same amber as the coverage rings
 
 const fmt = (v: number, d = 0): string => {
   if (!Number.isFinite(v)) return '—'
@@ -291,7 +292,15 @@ const ClosingGeometry: FC<DiagramProps> = ({ scenario }) => {
   const reach = reachSolution(scenario, det.detect_at_range_m)
   const maxReach = scenario.effector.max_engagement_range_m
   const rPad = scenario.effector.launch_pad_range_from_asset_m
-  const xMax = Math.max(scenario.threat.ingress_range_m, det.detect_at_range_m, maxReach, keepOut) * 1.08
+  const xMax =
+    Math.max(
+      scenario.threat.ingress_range_m,
+      det.detect_at_range_m,
+      reach.required_detection_range_m,
+      reach.commit_range_m,
+      maxReach,
+      keepOut,
+    ) * 1.08
   // asset at right (range 0), range grows leftwards
   const sx = scale(0, xMax, L + PW, L)
   const y0 = T + PH * 0.55
@@ -316,6 +325,14 @@ const ClosingGeometry: FC<DiagramProps> = ({ scenario }) => {
       {tick(maxReach, `도달반경 ${fmt(maxReach)}`, TXT_DIM, true)}
       {rPad > 0 && tick(rPad, `발사대 ${fmt(rPad)}`, TXT_DIM, false)}
       {tick(det.detect_at_range_m, `탐지 ${fmt(det.detect_at_range_m)}`, TXT, true)}
+      {/* doctrinal commit range + the detection range it demands */}
+      {tick(reach.commit_range_m, `발사개시 ${fmt(reach.commit_range_m)}`, ACCENT, false)}
+      {tick(
+        reach.required_detection_range_m,
+        `필요탐지 ${fmt(reach.required_detection_range_m)}`,
+        reach.detection_limited ? WARN : TXT_DIM,
+        true,
+      )}
       {/* threat inbound arrow */}
       <line x1={sx(det.detect_at_range_m)} y1={y0 - 22} x2={sx(Math.max(keepOut, reach.intercept_range_m))} y2={y0 - 22} stroke={CURVE} strokeWidth={1.5} markerEnd="url(#arrow)" />
       <text x={sx(det.detect_at_range_m)} y={y0 - 26} fill={CURVE} fontSize={9.5}>위협 v_t={fmt(scenario.threat.speed_m_s)}</text>
@@ -331,6 +348,9 @@ const ClosingGeometry: FC<DiagramProps> = ({ scenario }) => {
       )}
       <text x={L} y={H - 4} fill={feas ? CURVE : WARN} fontSize={10}>
         {feas ? `✓ 교전 성립 · 여유 ${fmt(reach.margin_m)} m` : `✗ ${reach.reason}`}
+        {reach.detection_limited
+          ? ` · ⚠ 탐지 제약(${fmt(reach.detection_margin_m)} m 부족)`
+          : ` · 탐지 여유 ${fmt(reach.detection_margin_m)} m`}
       </text>
       <defs>
         <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
@@ -348,7 +368,8 @@ const FovAcquisition: FC<DiagramProps> = ({ scenario }) => {
   const o = scenario.optics
   const size = scenario.threat.characteristic_size_m
   const det = computeDetection(scenario.sensor, scenario.threat, scenario.site.keep_out_radius_m)
-  const classifyRange = Math.max(1, det.detect_at_range_m - scenario.threat.speed_m_s * scenario.sensor.classify_time_s)
+  // Same range the kill chain classifies at — back-solved from the launch point.
+  const classifyRange = reachSolution(scenario, det.detect_at_range_m).classify_at_range_m
   const lo = 0.3
   const hi = 40
   const lx = (v: number) => Math.log10(v)

@@ -167,6 +167,84 @@
   opacity: 0.85;
 }
 
+/* ── Input validation ────────────────────────────────────── */
+.an-field.is-invalid input {
+  border-color: var(--warn, #ff6b6b);
+  box-shadow: 0 0 0 1px rgba(255, 107, 107, 0.35);
+}
+.an-bad-badge {
+  margin-left: var(--s-2);
+  padding: 0 var(--s-1);
+  border: 1px solid #ff6b6b;
+  border-radius: 2px;
+  color: #ff6b6b;
+  font-size: 0.72em;
+  letter-spacing: 0.04em;
+}
+.an-validation {
+  margin: var(--s-3) 0;
+  padding: var(--s-3);
+  border-radius: 3px;
+  border: 1px solid #ff6b6b;
+  background: rgba(255, 107, 107, 0.08);
+}
+.an-validation.is-warn {
+  border-color: #ffb020;
+  background: rgba(255, 176, 32, 0.08);
+}
+.an-validation-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--s-2);
+}
+.an-validation-tag {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: #ff6b6b;
+}
+.an-validation.is-warn .an-validation-tag {
+  color: #ffb020;
+}
+.an-validation-list {
+  margin: 0;
+  padding-left: var(--s-4);
+  line-height: var(--lh-normal);
+}
+.an-validation-list > li {
+  margin-bottom: var(--s-1);
+}
+.an-validation-list > li.is-warn {
+  color: var(--text3);
+}
+
+/* Collapsed group for curve-shape parameters the user should rarely touch —
+   keeps the intuitive inputs (quoted range + Pd there) uncluttered. */
+.an-advanced {
+  margin-top: var(--s-3);
+  border-top: 1px dashed var(--border);
+  padding-top: var(--s-2);
+}
+.an-advanced > summary {
+  cursor: pointer;
+  color: var(--text3);
+  list-style: none;
+  user-select: none;
+}
+.an-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+.an-advanced > summary::before {
+  content: '▸ ';
+}
+.an-advanced[open] > summary::before {
+  content: '▾ ';
+}
+.an-advanced > summary:hover {
+  color: var(--accent);
+}
+
 /* ── Results column ──────────────────────────────────────── */
 .an-results {
   overflow-y: auto;
