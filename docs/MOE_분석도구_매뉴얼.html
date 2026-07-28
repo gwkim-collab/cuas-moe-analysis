@@ -579,6 +579,16 @@ EO N50은 인식·식별 2개이며, &quot;요구 판별 수준(교전 기준)&q
 <p><strong>Q6. 기본 P_negate가 33.6%인 이유?</strong>
 게이트 곱(Q1) + <strong>결심-인식 커플링(기본 0.5)</strong> 때문에 P_decision이 98%→90%로 내려가서입니다. 커플링을 **0(독립)**으로
 두면 36.5%가 됩니다. (예시·스터디 수치는 커플링 0 기준으로 계산 — §요구사항 도출 예시의 안내 참조.)</p>
+<p><strong>Q8. P_acq(획득 확률)는 입력인가?</strong>
+아닙니다. <strong>계산되는 값</strong>입니다. P_acq = 1−exp(−(HFOV/2)²/(2σ²)), σ=√(큐오차²+지향오차²) — 즉 <strong>화각·큐
+오차·지향 오차(입력)로부터 산출</strong>됩니다. 좌측 패널 = 입력값(편집 가능), 우측 결과카드 = 계산값(P_acq·인식확률·
+P_classify 등, 읽기 전용). P_acq는 좌측에 없고 우측에만 나옵니다.</p>
+<p><strong>Q9. &quot;탐지&quot;와 &quot;분류&quot;는 뭐가 다른가?</strong></p>
+<ul>
+<li><strong>탐지(detection) = &quot;뭔가 있다&quot;</strong> → <strong>레이더</strong> 담당 (P_detect).</li>
+<li><strong>분류(classification) = &quot;이게 뭔지&quot;</strong> → <strong>EO/IR</strong> 담당 (P_classify). EO는 ①<strong>획득</strong>(화면에 들어왔나, P_acq)
+→ ②<strong>분류</strong>(인식=&quot;위협이냐&quot;·식별=&quot;어떤 기종&quot;). EO엔 탐지 단계가 없습니다(탐지는 레이더 몫).</li>
+</ul>
 <hr>
 <p><em>이 매뉴얼은 도구 현재 구현 상태 기준이며, 모델·파라미터가 갱신되면 함께 갱신합니다.</em>
 <em>MD가 원본이며, <code>pnpm gen:docs</code>로 같은 이름의 <code>.html</code>을 재생성해 함께 관리합니다.</em></p>
