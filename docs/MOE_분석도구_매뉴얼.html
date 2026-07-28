@@ -117,30 +117,32 @@ hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
 <tr>
 <th>교전 기준</th>
 <th>EO 게이트</th>
-<th>P_classify</th>
 <th>기본 P_negate</th>
+<th>오교전 위험(옵션)</th>
 </tr>
 </thead>
 <tbody><tr>
 <td><strong>탐지</strong>(레이더 단독)</td>
 <td>✗ 미적용</td>
-<td>분류기(선언) 상한</td>
 <td><strong>84.7%</strong></td>
+<td><strong>16%</strong></td>
 </tr>
 <tr>
 <td><strong>인식</strong>(EO 인식)</td>
 <td>✓ 적용 (인식 N50)</td>
-<td>P_acq×인식×대기투과×상한</td>
 <td>33.6%</td>
+<td>4%</td>
 </tr>
 <tr>
 <td><strong>식별</strong>(EO 식별)</td>
 <td>✓ 적용 (식별 N50)</td>
-<td>〃 (식별 N50, 더 엄격)</td>
 <td>13.7%</td>
+<td>1%</td>
 </tr>
 </tbody></table>
-<p>느슨한 ROE(탐지)는 실제 위협 무력화 확률이 높지만 <strong>오교전(민간·오인) 위험</strong>이 커집니다(현 모델 미반영).
+<p><strong>트레이드오프가 정량화됩니다</strong>: 느슨한 ROE(탐지)는 위협 무력화율↑(85%)이지만 <strong>오교전(비위협 격추) 위험↑</strong>(16%).
+엄격한 ROE(식별)는 무력화율↓(14%)이나 오교전 최소(1%). 무엇을 우선할지가 ROE 선택입니다.
+(오교전 위험 = 비위협 유입률 × 교전기준별 오통과율. <strong>C2 그룹의 &quot;오교전 위험 모델&quot; 옵션</strong>을 켜야 계산·표시됨. 기본 OFF.)
 아래 P_classify 식은 <strong>인식·식별</strong> 기준일 때 적용:</p>
 <pre><code>P_classify = P_acq × 인식(Johnson) × 대기투과 T × 분류기 상한     (인식·식별 기준)
 P_classify = 분류기(선언) 상한                                    (탐지 기준 — 레이더 단독)
@@ -355,7 +357,8 @@ RCS가 다르면 R∝RCS^¼로 환산(RCS 16배 → 필요 거리 2배).</p>
 <li><strong>이팩터</strong>: 페이로드(택일), 발사 지연, 순항속도, 요격기 도달 반경(≠넷건 사거리), 발사대 거리,
 <strong>단발 Pk·net / ·shotgun(독립 입력, 페이로드가 선택한 쪽만 P_kill에 사용 — 활성 강조 표시)</strong>,
 사격 기회, 체공 시간, 여유 σ</li>
-<li><strong>C2</strong>: 결심 지연, 결심 신뢰도, <strong>결심-인식 커플링</strong>(인식 애매 시 결심 신뢰도 저하 정도)</li>
+<li><strong>C2</strong>: 결심 지연, 결심 신뢰도, <strong>결심-인식 커플링</strong>(인식 애매 시 결심 신뢰도 저하 정도),
+<strong>오교전 위험 모델(옵션)</strong> — 켜면 비위협 유입률·오통과율(탐지/인식/식별) 노출</li>
 <li><strong>사이트</strong>: keep-out 반경, 자산 위경도</li>
 </ul>
 <h2>5. 결과 읽기</h2>
@@ -526,7 +529,8 @@ RCS가 다르면 R∝RCS^¼로 환산(RCS 16배 → 필요 거리 2배).</p>
 <p><strong>Q7. 교전 기준(요구 판별 수준)이 결과를 크게 바꾼다?</strong>
 네. 이건 킬체인 <strong>구조</strong>를 바꿉니다. <strong>탐지</strong>(레이더 단독)는 EO 게이트를 아예 빼서 P_negate가 높지만(예 84.7%)
 오교전 위험↑. <strong>인식</strong>(33.6%)·<strong>식별</strong>(13.7%)은 EO 게이트를 적용(식별이 더 엄격). 느슨할수록 무력화율↑·안전성↓의
-트레이드오프이며, 오교전(민간 오인) 위험은 현 모델에 미반영입니다.</p>
+트레이드오프이며, <strong>오교전(비위협 격추) 위험</strong>은 C2 그룹의 &quot;오교전 위험 모델&quot; 옵션을 켜면 정량화됩니다
+(탐지 16% / 인식 4% / 식별 1%). P_negate와 별개 지표입니다.</p>
 <p><strong>Q4. &quot;요격기 도달 반경&quot;이 넷건 사거리인가?</strong>
 아닙니다. <strong>요격기 도달 반경</strong>(기본 2500m)은 요격 드론(AB-U10)이 발사대에서 날아가 도달하는 <strong>작전 반경</strong>입니다.
 **넷건 사거리(~25m)**는 도달 후 표적에 붙어 넷을 쏘는 <strong>종말 발사 거리</strong>(별개, 현재 P_kill에 암묵 포함).</p>

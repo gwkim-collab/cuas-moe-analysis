@@ -193,6 +193,24 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <NumField label="결심 지연" unit="s" value={c.decision_latency_s} step={0.5} paramKey="c2.decision_latency_s" onExplain={onExplain} onChange={(v) => setC2({ decision_latency_s: v })} />
         <NumField label="결심 신뢰도" value={c.decision_reliability} step={0.01} paramKey="c2.decision_reliability" onExplain={onExplain} onChange={(v) => setC2({ decision_reliability: v })} />
         <NumField label="결심-인식 커플링" value={c.decision_recognition_coupling} step={0.1} paramKey="c2.decision_recognition_coupling" onExplain={onExplain} onChange={(v) => setC2({ decision_recognition_coupling: v })} />
+        <label className="an-field" title="오교전(비위협 격추) 위험을 별도 지표로 계산 — P_negate와 무관, 필요할 때만 켜기">
+          <span className="an-field-label">오교전 위험 모델</span>
+          <select
+            value={c.false_engagement_enabled ? 'on' : 'off'}
+            onChange={(ev) => setC2({ false_engagement_enabled: ev.target.value === 'on' })}
+          >
+            <option value="off">끔 (기본)</option>
+            <option value="on">켬</option>
+          </select>
+        </label>
+        {c.false_engagement_enabled ? (
+          <>
+            <NumField label="비위협 유입률" value={c.non_threat_rate} step={0.05} paramKey="c2.non_threat_rate" onExplain={onExplain} onChange={(v) => setC2({ non_threat_rate: v })} />
+            <NumField label="비위협 오통과·탐지" value={c.false_pass_detection} step={0.05} paramKey="c2.false_pass_detection" onExplain={onExplain} onChange={(v) => setC2({ false_pass_detection: v })} />
+            <NumField label="비위협 오통과·인식" value={c.false_pass_recognition} step={0.05} paramKey="c2.false_pass_recognition" onExplain={onExplain} onChange={(v) => setC2({ false_pass_recognition: v })} />
+            <NumField label="비위협 오통과·식별" value={c.false_pass_identification} step={0.01} paramKey="c2.false_pass_identification" onExplain={onExplain} onChange={(v) => setC2({ false_pass_identification: v })} />
+          </>
+        ) : null}
       </fieldset>
 
       <fieldset className="an-group">

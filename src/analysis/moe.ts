@@ -73,6 +73,11 @@ export interface MoeResult {
   single_shot_pk: number
   /** Whether the engagement geometry is feasible at all. */
   feasible: boolean
+  /**
+   * OPTION — probability of a wrong engagement against a non-threat, given the
+   * current ROE. null when the option is disabled. SEPARATE from p_negate.
+   */
+  false_engagement: number | null
 }
 
 /**
@@ -148,6 +153,18 @@ export function computeMoe(s: Scenario): MoeResult {
     1,
   )
 
+  // OPTION — wrong-engagement risk (separate from p_negate). A non-threat is
+  // engaged if it enters the track pool AND passes the current ROE gate; looser
+  // ROE (detection) lets more non-threats through.
+  const false_pass = {
+    detection: s.c2.false_pass_detection,
+    recognition: s.c2.false_pass_recognition,
+    identification: s.c2.false_pass_identification,
+  }[s.optics.required_discrimination]
+  const false_engagement = s.c2.false_engagement_enabled
+    ? clamp(s.c2.non_threat_rate * false_pass, 0, 1)
+    : null
+
   return {
     p_negate,
     leakage: clamp(1 - p_negate, 0, 1),
@@ -157,5 +174,6 @@ export function computeMoe(s: Scenario): MoeResult {
     reach,
     single_shot_pk: singleShotPk(s.effector),
     feasible: reach.feasible,
+    false_engagement,
   }
 }

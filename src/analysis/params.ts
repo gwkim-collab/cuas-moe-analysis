@@ -260,6 +260,30 @@ export const PARAM_INFO: ParamInfo[] = [
     source: `가정(모델 파라미터) · 편집 가능`,
     get: (s) => s.c2.decision_recognition_coupling, set: S('c2', 'decision_recognition_coupling'), sweep: { min: 0, max: 1 },
   },
+  {
+    key: 'c2.non_threat_rate', section: 'C2', label: '비위협 유입률', unit: '',
+    description: '[오교전 옵션] 제시 트랙 중 실제 비위협(새·아군·클러터) 비율. 오교전 확률 = 이 값 × ROE별 오통과율.',
+    source: `가정(모델 파라미터) · 편집 가능`,
+    get: (s) => s.c2.non_threat_rate, set: S('c2', 'non_threat_rate'), sweep: { min: 0, max: 1 },
+  },
+  {
+    key: 'c2.false_pass_detection', section: 'C2', label: '비위협 오통과 · 탐지', unit: '',
+    description: '[오교전 옵션] 교전 기준=탐지(레이더 단독)일 때 비위협이 오통과할 확률(느슨 → 높음).',
+    source: `가정(모델 파라미터) · 편집 가능`,
+    get: (s) => s.c2.false_pass_detection, set: S('c2', 'false_pass_detection'), sweep: { min: 0, max: 1 },
+  },
+  {
+    key: 'c2.false_pass_recognition', section: 'C2', label: '비위협 오통과 · 인식', unit: '',
+    description: '[오교전 옵션] 교전 기준=인식일 때 비위협 오통과 확률(EO 인식이 대부분 기각).',
+    source: `가정(모델 파라미터) · 편집 가능`,
+    get: (s) => s.c2.false_pass_recognition, set: S('c2', 'false_pass_recognition'), sweep: { min: 0, max: 1 },
+  },
+  {
+    key: 'c2.false_pass_identification', section: 'C2', label: '비위협 오통과 · 식별', unit: '',
+    description: '[오교전 옵션] 교전 기준=식별일 때 비위협 오통과 확률(식별은 거의 다 기각).',
+    source: `가정(모델 파라미터) · 편집 가능`,
+    get: (s) => s.c2.false_pass_identification, set: S('c2', 'false_pass_identification'), sweep: { min: 0, max: 1 },
+  },
 
   // ── 사이트 ──────────────────────────────────────────────
   {

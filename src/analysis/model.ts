@@ -144,6 +144,18 @@ export interface C2Spec {
    * sensitivity to a marginal image. SME-VERIFY.
    */
   decision_recognition_coupling: number
+  /**
+   * OPTION — model wrong-engagement (non-threat) risk. When false, it is not
+   * computed and not shown. This is a SEPARATE risk metric, not part of P_negate.
+   */
+  false_engagement_enabled: boolean
+  /** Fraction of engageable tracks that are actually non-threats (bird/friendly/clutter), 0..1. */
+  non_threat_rate: number
+  /** Probability a non-threat is wrongly passed to engagement under each ROE
+   * (looser ROE → higher). P_false_engage = non_threat_rate × false_pass[ROE]. SME-VERIFY */
+  false_pass_detection: number
+  false_pass_recognition: number
+  false_pass_identification: number
 }
 
 // ── Site (protected asset + engagement constraints) ───────────
@@ -222,6 +234,11 @@ export const DEFAULT_C2: C2Spec = {
   decision_latency_s: 10,
   decision_reliability: 0.98,
   decision_recognition_coupling: 0.5, // moderate coupling — SME-VERIFY (0 = independent)
+  false_engagement_enabled: false, // OPTION off by default — enable to model 오교전 risk
+  non_threat_rate: 0.2, // 비위협 유입률 — SME-VERIFY
+  false_pass_detection: 0.8, // 레이더 단독은 비위협 오통과 높음 — SME-VERIFY
+  false_pass_recognition: 0.2, // EO 인식이 비위협 대부분 기각 — SME-VERIFY
+  false_pass_identification: 0.05, // 식별은 거의 다 기각 — SME-VERIFY
 }
 
 export const DEFAULT_SITE: SiteSpec = {

@@ -24,7 +24,7 @@ function GateBar({ label, value }: { label: string; value: number }) {
 }
 
 export default function MoeResultCards({ result }: Props) {
-  const { p_negate, leakage, breakdown, detection, optics, reach, single_shot_pk, feasible } = result
+  const { p_negate, leakage, breakdown, detection, optics, reach, single_shot_pk, feasible, false_engagement } = result
 
   return (
     <div className="an-results">
@@ -47,6 +47,14 @@ export default function MoeResultCards({ result }: Props) {
 
       {!feasible && reach.reason && (
         <div className="an-reason">불성립 사유: {reach.reason}</div>
+      )}
+
+      {false_engagement != null && (
+        <div className="an-false-eng">
+          <span className="an-fe-tag">오교전 위험</span>
+          <span className="an-fe-val">{pct(false_engagement)}</span>
+          <span className="an-fe-note ab-small">비위협(새·아군·클러터) 격추 확률 · P_negate와 별개 · 현 교전 기준 기준</span>
+        </div>
       )}
 
       {/* Bottleneck diagnosis — the limiting kill-chain stage + what to fix */}

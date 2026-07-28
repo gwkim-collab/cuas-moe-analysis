@@ -20,6 +20,7 @@ import { paramExplain } from './paramExplain'
 const HEADER = ['구분', '파라미터', 'key', '값', '단위', '의미', '값 출처', '수식', '이론 근거', '모델 가정']
 const PAYLOAD_KEY = 'effector.payload'
 const DISC_KEY = 'optics.required_discrimination'
+const FALSE_ENG_KEY = 'c2.false_engagement_enabled'
 
 // Flatten multi-line formula/theory to a single cell (Excel-friendly).
 function flat(s?: string): string {
@@ -127,6 +128,19 @@ export function scenarioToCsv(scenario: Scenario): string {
       '', '', '',
     ]),
   )
+  // false-engagement option (bool) as a text row.
+  lines.push(
+    toRow([
+      'C2',
+      '오교전 위험 모델',
+      FALSE_ENG_KEY,
+      scenario.c2.false_engagement_enabled ? 'on' : 'off',
+      '',
+      "오교전(비위협 격추) 위험 계산 옵션('on'/'off'). off면 미계산.",
+      '운용 설정값',
+      '', '', '',
+    ]),
+  )
   return lines.join('\r\n')
 }
 
@@ -180,6 +194,14 @@ export function applyCsv(base: Scenario, text: string): CsvImportResult {
     if (key === DISC_KEY) {
       if (rawVal === 'detection' || rawVal === 'recognition' || rawVal === 'identification') {
         scenario = { ...scenario, optics: { ...scenario.optics, required_discrimination: rawVal } }
+        applied++
+      }
+      continue
+    }
+
+    if (key === FALSE_ENG_KEY) {
+      if (rawVal === 'on' || rawVal === 'off') {
+        scenario = { ...scenario, c2: { ...scenario.c2, false_engagement_enabled: rawVal === 'on' } }
         applied++
       }
       continue

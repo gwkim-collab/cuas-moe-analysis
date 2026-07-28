@@ -176,6 +176,21 @@ describe('computeMoe composition', () => {
     expect(computeMoe(a).p_negate).toBeCloseTo(computeMoe(b).p_negate, 9)
   })
 
+  it('false-engagement option: null when off; computed & looser-ROE-worse when on', () => {
+    expect(computeMoe(scn()).false_engagement).toBeNull() // off by default
+
+    const det = scn(); det.c2.false_engagement_enabled = true; det.optics.required_discrimination = 'detection'
+    const id = scn(); id.c2.false_engagement_enabled = true; id.optics.required_discrimination = 'identification'
+    const fDet = computeMoe(det).false_engagement!
+    const fId = computeMoe(id).false_engagement!
+    expect(fDet).toBeCloseTo(det.c2.non_threat_rate * det.c2.false_pass_detection, 9)
+    expect(fDet).toBeGreaterThan(fId) // radar-only ROE → more wrong engagements
+
+    // enabling the option does not change p_negate (it is a separate metric)
+    const detOff = scn(); detOff.optics.required_discrimination = 'detection'
+    expect(computeMoe(det).p_negate).toBeCloseTo(computeMoe(detOff).p_negate, 9)
+  })
+
   it('p_negate never exceeds any single gate probability', () => {
     const r = computeMoe(scn())
     const { p_detect, p_classify, p_decision, p_reach, p_kill } = r.breakdown

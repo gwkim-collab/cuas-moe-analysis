@@ -527,6 +527,16 @@ button.an-field-info:hover { opacity: 1; }
 .an-btn-mini:disabled { opacity: 0.4; cursor: default; }
 .an-ref-explain { text-align: right; }
 
+/* ── false-engagement (오교전) risk banner ─────────────────── */
+.an-false-eng {
+  display: flex; align-items: baseline; gap: var(--s-2); flex-wrap: wrap;
+  background: rgba(255,176,32,0.10); border: 1px solid var(--amber);
+  border-radius: var(--r-2); padding: var(--s-2) var(--s-3); margin-bottom: var(--s-3);
+}
+.an-fe-tag { font-size: var(--fs-micro); color: var(--amber); border: 1px solid var(--amber); border-radius: var(--r-1); padding: 1px 6px; letter-spacing: var(--ls-label); }
+.an-fe-val { font-family: var(--font-mono); font-weight: 700; color: var(--amber); font-size: var(--fs-h2); }
+.an-fe-note { color: var(--text3); }
+
 /* ── bottleneck diagnosis card ─────────────────────────────── */
 .an-bottleneck {
   background: var(--bg-sunken);
