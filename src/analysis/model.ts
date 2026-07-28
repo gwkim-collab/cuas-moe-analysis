@@ -65,15 +65,18 @@ export interface OpticalSensorSpec {
   /** Sensor width (mm) — used only for the focal-length ↔ FOV conversion display. */
   sensor_width_mm: number
   /**
-   * Johnson N50 (pixels on target for 50% task probability) per discrimination
-   * level. Johnson's criteria give these in CYCLES across the min dimension
-   * (detection ≈1.0, recognition ≈4.0, identification ≈6.4); here they are in
-   * PIXELS (≈ 2× cycles). Detection < recognition < identification. SME-VERIFY
+   * Johnson N50 (pixels on target for 50% task probability) for the EO tasks.
+   * Johnson's criteria give these in CYCLES (recognition ≈4.0, identification
+   * ≈6.4); here they are in PIXELS (≈ 2× cycles). recognition < identification.
+   * (Detection-grade N50 is not modelled: the 'detection' ROE is radar-only,
+   * so the EO is not used at all.) SME-VERIFY
    */
-  n50_detection: number
   n50_recognition: number
   n50_identification: number
-  /** Which discrimination level the classify stage requires to declare hostile. */
+  /**
+   * Engagement authorization basis (ROE): 'detection' = shoot on radar alone
+   * (no EO gate); 'recognition'/'identification' = EO must confirm at that level.
+   */
   required_discrimination: DiscriminationLevel
   /**
    * Radar-cue angular error, 1σ (deg). This is a GIMBAL-LESS system: the
@@ -202,9 +205,8 @@ export const DEFAULT_OPTICS: OpticalSensorSpec = {
   h_resolution_px: 1920,
   hfov_deg: 1.5, // narrow EO for recognition at range (NO gimbal — see cue/pointing error)
   sensor_width_mm: 6.4,
-  // px ≈ 2× Johnson cycles (detection 1.0 / recognition 4.0 / identification 6.4).
+  // px ≈ 2× Johnson cycles (recognition 4.0 / identification 6.4).
   // recognition kept at 6 px for baseline continuity — SME-VERIFY the cycle basis.
-  n50_detection: 1.5,
   n50_recognition: 6,
   n50_identification: 10,
   required_discrimination: 'recognition',

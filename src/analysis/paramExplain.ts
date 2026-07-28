@@ -155,13 +155,6 @@ export const PARAM_EXPLAIN: Record<string, ParamExplain> = {
     formula: 'HFOV = 2 · atan(sensor_w / (2 · f))',
     detail: '센서 물리 폭. 초점거리 f ↔ 화각 환산 표시용이며 인식 픽셀 계산에는 직접 쓰이지 않습니다.',
   },
-  'optics.n50_detection': {
-    theory: `${REF_JOHNSON}: 탐지급 ≈1.0 cycle. 판별수준별 N50 상이(탐지<인식<식별).`,
-    assumption: '⚠ 교전 기준="탐지"는 레이더 단독(EO 게이트 미적용)이라 이 값은 P_negate에 반영 안 됨(표시용). EO 기반(인식·식별)에서만 EO 게이트 적용.',
-    formula: 'P = nᴱ / (1 + nᴱ),  n = N_px / N50_탐지',
-    detail: 'EO 탐지급 문턱. 다만 현재 "탐지" 교전 기준은 레이더 탐지만으로 승인이라 EO가 안 쓰여 이 값은 결과에 영향 없음(참고용).',
-    diagram: 'johnson-n50',
-  },
   'optics.n50_recognition': {
     theory: `${REF_JOHNSON}: 인식급 ≈4.0 cycle. 판별수준별 N50 상이(탐지<인식<식별).`,
     assumption: 'N50 단위 px(≈2×cycle). 요구 판별수준="인식"일 때 사용(기본).',

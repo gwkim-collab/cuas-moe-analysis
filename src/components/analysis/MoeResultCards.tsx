@@ -25,6 +25,8 @@ function GateBar({ label, value }: { label: string; value: number }) {
 
 export default function MoeResultCards({ result }: Props) {
   const { p_negate, leakage, breakdown, detection, optics, reach, single_shot_pk, feasible, false_engagement } = result
+  const eo = optics.eo_gate_applied
+  const taskName = optics.discrimination_level === 'identification' ? '식별' : '인식'
 
   return (
     <div className="an-results">
@@ -93,18 +95,18 @@ export default function MoeResultCards({ result }: Props) {
             : '탐지 기반 교전(레이더 단독) — EO 게이트 미적용. P_classify = 분류기(선언) 상한. 아래 EO 값은 참고용.'}
         </div>
         <dl className="an-readout">
-          <div><dt>분류 완료 거리</dt><dd>{optics.classify_range_m.toFixed(0)} m</dd></div>
-          <div className={optics.pixels_on_target >= 1 ? '' : 'bad'}>
-            <dt>표적 픽셀 수</dt><dd>{optics.pixels_on_target.toFixed(1)} px</dd>
+          <div><dt>분류 완료 거리</dt><dd>{eo ? `${optics.classify_range_m.toFixed(0)} m` : '—'}</dd></div>
+          <div className={eo && optics.pixels_on_target < 1 ? 'bad' : ''}>
+            <dt>표적 픽셀 수</dt><dd>{eo ? `${optics.pixels_on_target.toFixed(1)} px` : '—'}</dd>
           </div>
-          <div><dt>인식 확률</dt><dd>{pct(optics.recognition_prob)}</dd></div>
-          <div><dt>50% 인식 거리</dt><dd>{optics.recognition_range_50_m.toFixed(0)} m</dd></div>
-          <div><dt>지향 오차 σ (큐⊕지향)</dt><dd>{optics.pointing_sigma_deg.toFixed(2)}°</dd></div>
-          <div className={optics.acquisition_prob >= 0.5 ? '' : 'bad'}>
-            <dt>획득 확률 P_acq</dt><dd>{pct(optics.acquisition_prob)}</dd>
+          <div><dt>{taskName} 확률</dt><dd>{eo ? pct(optics.recognition_prob) : '—'}</dd></div>
+          <div><dt>50% {taskName} 거리</dt><dd>{eo ? `${optics.recognition_range_50_m.toFixed(0)} m` : '—'}</dd></div>
+          <div><dt>지향 오차 σ (큐⊕지향)</dt><dd>{eo ? `${optics.pointing_sigma_deg.toFixed(2)}°` : '—'}</dd></div>
+          <div className={eo && optics.acquisition_prob < 0.5 ? 'bad' : ''}>
+            <dt>획득 확률 P_acq</dt><dd>{eo ? pct(optics.acquisition_prob) : '—'}</dd>
           </div>
-          <div className={optics.atmospheric_transmission >= 0.5 ? '' : 'bad'}>
-            <dt>대기 투과 (시정)</dt><dd>{pct(optics.atmospheric_transmission)}</dd>
+          <div className={eo && optics.atmospheric_transmission < 0.5 ? 'bad' : ''}>
+            <dt>대기 투과 (시정)</dt><dd>{eo ? pct(optics.atmospheric_transmission) : '—'}</dd>
           </div>
         </dl>
       </div>

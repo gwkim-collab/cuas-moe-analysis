@@ -153,8 +153,8 @@ P_classify = 분류기(선언) 상한                                    (탐지
 → 화각을 좁히면 인식은 쉬워지나 획득이 떨어져 <strong>최적 화각</strong>이 존재.</li>
 <li><strong>인식(Johnson/NVESD)</strong> — <code>P = nᴱ/(1+nᴱ)</code>, <code>n = 표적픽셀수/N50</code>, <code>E = 2.7+0.7n</code>.
 표적 픽셀 수 <code>N = 크기·H_px/(경사거리·HFOV_rad)</code>.
-판별 수준별 N50 분리: <strong>탐지(≈1.0cyc) &lt; 인식(≈4.0cyc) &lt; 식별(≈6.4cyc)</strong> (px≈2×cycle).
-&quot;요구 판별 수준&quot; 선택이 P_classify에 쓰이는 N50을 결정.</li>
+EO 분류 N50: <strong>인식(≈4.0cyc) &lt; 식별(≈6.4cyc)</strong> (px≈2×cycle). 탐지(&quot;뭔가 있다&quot;)는 레이더 몫(P_detect)이라
+EO N50이 없음. 교전 기준이 인식/식별이면 해당 N50이 P_classify에 쓰임.</li>
 <li><strong>대기투과 T</strong> — Koschmieder <code>β=3.912/시정(km)</code> + Beer-Lambert <code>T=exp(−β·R)</code>.</li>
 <li><strong>경사거리(3D)</strong> — 지상 센서 LOS = √(수평²+고도²). 탐지·인식·대기투과는 경사거리로 평가
 (고고도 표적 불리). 교전 closing 기하는 수평 반경(현재 가정).</li>
@@ -353,7 +353,7 @@ RCS가 다르면 R∝RCS^¼로 환산(RCS 16배 → 필요 거리 2배).</p>
 <ul>
 <li><strong>위협</strong>: RCS, 속도, 고도 AGL, 진입거리, 진입방위, 표적크기</li>
 <li><strong>레이더</strong>: 기준 RCS/탐지거리, 최대 Pd, 전이 폭, 재방문 주기, 분류 시간, 분류기 상한</li>
-<li><strong>EO/IR</strong>: 화각, 해상도, 센서폭, <strong>요구 판별 수준</strong>, 탐지/인식/식별 N50, 레이더 큐 오차, 요격기 지향 오차, 대기 시정</li>
+<li><strong>EO/IR</strong>: 화각, 해상도, 센서폭, <strong>요구 판별 수준(교전 기준)</strong>, 인식·식별 N50, 레이더 큐 오차, 요격기 지향 오차, 대기 시정</li>
 <li><strong>이팩터</strong>: 페이로드(택일), 발사 지연, 순항속도, 요격기 도달 반경(≠넷건 사거리), 발사대 거리,
 <strong>단발 Pk·net / ·shotgun(독립 입력, 페이로드가 선택한 쪽만 P_kill에 사용 — 활성 강조 표시)</strong>,
 사격 기회, 체공 시간, 여유 σ</li>
@@ -522,10 +522,11 @@ RCS가 다르면 R∝RCS^¼로 환산(RCS 16배 → 필요 거리 2배).</p>
 전이 폭은 탐지 Pd 곡선의 경계 완만도에만 작용합니다. 기본 시나리오는 누적 탐지가 이미 <strong>P_detect≈100%로 포화</strong>라
 체감이 거의 없습니다. 큰 값(1000·2000m)으로 바꾸면 탐지 시점(detect_at)이 안쪽으로 이동 → 분류 거리→인식 경로로
 소폭(+1%p)만 나타납니다. 탐지가 아슬아슬한 설계에서만 크게 작동.</p>
-<p><strong>Q3. 식별 N50(또는 탐지 N50)을 바꿔도 무변한다?</strong>
-&quot;요구 판별 수준(교전 기준)&quot;에 따라 다릅니다. <strong>인식/식별</strong> 기준일 때 해당 N50만 P_classify에 쓰입니다(기본은 인식 →
-인식 N50만 활성). 식별 N50을 반영하려면 교전 기준을 <strong>식별</strong>로 바꾸세요. ⚠ <strong>탐지 N50</strong>은 &quot;탐지&quot; 교전 기준이
-**레이더 단독(EO 미적용)**이라 지금은 결과에 안 쓰입니다(표시용). — Q7 참조.</p>
+<p><strong>Q3. 인식/식별 N50을 바꿔도 결과가 안 변할 때가 있다?</strong>
+EO N50은 인식·식별 2개이며, &quot;요구 판별 수준(교전 기준)&quot;에 해당하는 것만 P_classify에 쓰입니다. 기본은 <strong>인식</strong>이라
+인식 N50만 활성(식별 N50 무변). 식별 N50을 반영하려면 교전 기준을 <strong>식별</strong>로 바꾸세요. 교전 기준이 **탐지(레이더
+단독)**면 EO를 안 써서 두 N50 모두 결과에 영향이 없고, EO 표시값은 &quot;—&quot;로 나옵니다. — Q7 참조.
+(참고: &quot;탐지=뭔가 있다&quot;는 레이더 몫(P_detect), &quot;분류=이게 뭔지&quot;는 EO 몫(P_classify: 인식/식별).)</p>
 <p><strong>Q7. 교전 기준(요구 판별 수준)이 결과를 크게 바꾼다?</strong>
 네. 이건 킬체인 <strong>구조</strong>를 바꿉니다. <strong>탐지</strong>(레이더 단독)는 EO 게이트를 아예 빼서 P_negate가 높지만(예 84.7%)
 오교전 위험↑. <strong>인식</strong>(33.6%)·<strong>식별</strong>(13.7%)은 EO 게이트를 적용(식별이 더 엄격). 느슨할수록 무력화율↑·안전성↓의

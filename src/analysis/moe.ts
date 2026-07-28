@@ -21,7 +21,7 @@
 // (P_reach especially) into fractions with confidence intervals.
 // ────────────────────────────────────────────────────────────
 
-import type { Scenario } from './model'
+import type { Scenario, DiscriminationLevel } from './model'
 import { computeDetection, type DetectionResult } from './detection'
 import { reachSolution, type ReachSolution } from './kinematics'
 import { effectorKillProbability, singleShotPk } from './engagement'
@@ -54,6 +54,8 @@ export interface OpticsBreakdown {
   atmospheric_transmission: number
   /** Whether the EO gate is applied to P_classify (false for radar-only ROE). */
   eo_gate_applied: boolean
+  /** The ROE / discrimination level driving classification. */
+  discrimination_level: DiscriminationLevel
 }
 
 export interface MoeResult {
@@ -113,6 +115,7 @@ export function computeMoe(s: Scenario): MoeResult {
     acquisition_prob,
     atmospheric_transmission,
     eo_gate_applied,
+    discrimination_level: s.optics.required_discrimination,
   }
 
   const p_detect = clamp(detection.cumulative_pd, 0, 1)

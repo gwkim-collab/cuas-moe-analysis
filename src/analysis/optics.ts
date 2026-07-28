@@ -46,16 +46,13 @@ export function johnsonProb(n: number): number {
   return nE / (1 + nE)
 }
 
-/** N50 (px) for the currently required discrimination level. */
+/**
+ * N50 (px) for the currently required EO task. 'detection' ROE is radar-only
+ * (EO unused), so it falls back to the recognition N50 for the informational
+ * readout only — it never gates P_classify under detection.
+ */
 export function activeN50(o: OpticalSensorSpec): number {
-  switch (o.required_discrimination) {
-    case 'detection':
-      return o.n50_detection
-    case 'identification':
-      return o.n50_identification
-    default:
-      return o.n50_recognition
-  }
+  return o.required_discrimination === 'identification' ? o.n50_identification : o.n50_recognition
 }
 
 /**

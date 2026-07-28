@@ -148,7 +148,6 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
             <option value="identification">식별 (기종)</option>
           </select>
         </label>
-        <NumField label="탐지 N50" unit="px" value={o.n50_detection} step={0.5} paramKey="optics.n50_detection" onExplain={onExplain} onChange={(v) => setOptics({ n50_detection: v })} />
         <NumField label="인식 N50" unit="px" value={o.n50_recognition} step={1} paramKey="optics.n50_recognition" onExplain={onExplain} onChange={(v) => setOptics({ n50_recognition: v })} />
         <NumField label="식별 N50" unit="px" value={o.n50_identification} step={1} paramKey="optics.n50_identification" onExplain={onExplain} onChange={(v) => setOptics({ n50_identification: v })} />
         <NumField label="레이더 큐 오차" unit="°" value={o.cue_error_deg} step={0.1} paramKey="optics.cue_error_deg" onExplain={onExplain} onChange={(v) => setOptics({ cue_error_deg: v })} />

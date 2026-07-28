@@ -88,13 +88,11 @@ describe('acquisition (gimbal-less FOV coverage)', () => {
 })
 
 describe('Johnson discrimination levels (per-level N50)', () => {
-  it('a harder required level (higher N50) lowers task probability at the same range', () => {
+  it('identification (higher N50) lowers task probability vs recognition at the same range', () => {
     const size = 0.35
     const range = 1500
-    const det = recognitionProb({ ...O, required_discrimination: 'detection' }, size, range)
     const rec = recognitionProb({ ...O, required_discrimination: 'recognition' }, size, range)
     const id = recognitionProb({ ...O, required_discrimination: 'identification' }, size, range)
-    expect(det).toBeGreaterThan(rec)
     expect(rec).toBeGreaterThan(id)
   })
 
