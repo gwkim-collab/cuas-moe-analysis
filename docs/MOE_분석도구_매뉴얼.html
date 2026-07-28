@@ -111,6 +111,45 @@ hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
 </tr>
 </tbody></table>
 <h3>3.2 P_classify 상세 (짐벌 없는 EO 전제)</h3>
+<p><strong>EO/IR 처리 단계</strong> — 레이더가 탐지(&quot;뭔가 있다&quot;)해 준 표적을 받아 EO는 두 단계로 처리합니다:</p>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>질문</th>
+<th>무엇을 보나</th>
+<th>파라미터</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>① 획득 (Acquisition)</strong></td>
+<td>&quot;화면에 들어왔나?&quot;</td>
+<td>짐벌 없는 고정 FOV 안에 표적이 드는지 (지향 정밀도)</td>
+<td>P_acq — 화각, 레이더 큐·요격기 지향 오차 σ</td>
+</tr>
+<tr>
+<td><strong>② 분류 (Classification)</strong></td>
+<td>&quot;이게 뭔지?&quot;</td>
+<td>들어온 표적을 Johnson 기준으로 판별</td>
+<td>인식·식별 N50</td>
+</tr>
+<tr>
+<td>&nbsp;&nbsp;· 인식 (Recognition)</td>
+<td>&quot;위협이냐 아니냐?&quot;</td>
+<td>부류 판단(드론 vs 새)</td>
+<td>인식 N50 (≈4.0cyc)</td>
+</tr>
+<tr>
+<td>&nbsp;&nbsp;· 식별 (Identification)</td>
+<td>&quot;어떤 기종이냐?&quot;</td>
+<td>형식 판단</td>
+<td>식별 N50 (≈6.4cyc)</td>
+</tr>
+</tbody></table>
+<p>여기에 <strong>대기투과</strong>(대비 손실)와 <strong>분류기 상한</strong>이 곱해집니다. 순서: <strong>획득(들어왔나) → 분류(뭔지)</strong>.
+탐지(&quot;뭔가 있다&quot;)는 이 앞의 **레이더 단계(P_detect)**이며 EO엔 탐지 단계가 없습니다.</p>
+<pre><code>P_classify = P_acq(획득) × 인식/식별(Johnson 분류) × 대기투과 × 분류기 상한
+</code></pre>
 <p><strong>교전 기준(ROE)이 킬체인 구조를 바꿉니다</strong> — &quot;요구 판별 수준&quot;에 따라 EO 게이트 적용 여부가 달라짐:</p>
 <table>
 <thead>
@@ -151,7 +190,7 @@ P_classify = 분류기(선언) 상한                                    (탐지
 <li><strong>획득 P_acq</strong> — 짐벌이 없어 표적이 고정 FOV에 들어와야 함. 원형 가우시안 지향오차 → Rayleigh:
 <code>P_acq = 1 − exp(−(HFOV/2)² / (2σ²))</code>, <code>σ = √(레이더 큐 오차² + 요격기 지향 오차²)</code>
 → 화각을 좁히면 인식은 쉬워지나 획득이 떨어져 <strong>최적 화각</strong>이 존재.</li>
-<li><strong>인식(Johnson/NVESD)</strong> — <code>P = nᴱ/(1+nᴱ)</code>, <code>n = 표적픽셀수/N50</code>, <code>E = 2.7+0.7n</code>.
+<li><strong>분류 · 인식/식별(Johnson/NVESD)</strong> — <code>P = nᴱ/(1+nᴱ)</code>, <code>n = 표적픽셀수/N50</code>, <code>E = 2.7+0.7n</code>.
 표적 픽셀 수 <code>N = 크기·H_px/(경사거리·HFOV_rad)</code>.
 EO 분류 N50: <strong>인식(≈4.0cyc) &lt; 식별(≈6.4cyc)</strong> (px≈2×cycle). 탐지(&quot;뭔가 있다&quot;)는 레이더 몫(P_detect)이라
 EO N50이 없음. 교전 기준이 인식/식별이면 해당 N50이 P_classify에 쓰임.</li>
