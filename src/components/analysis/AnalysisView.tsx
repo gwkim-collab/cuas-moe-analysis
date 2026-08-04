@@ -72,16 +72,29 @@ export default function AnalysisView({ onExit }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [explainKey, setExplainKey] = useState<string | null>(null)
 
-  const engagementResult = useMemo(() => computeMoe(scenario), [scenario])
+  const validationIssues = useMemo(() => validateScenario(scenario), [scenario])
+  const validationErrors = useMemo(
+    () => validationIssues.filter((issue) => issue.severity === 'error'),
+    [validationIssues],
+  )
+  const isValid = validationErrors.length === 0
+
+  // Fail closed: defensive clamps in the core must not turn impossible input
+  // into a plausible-looking result at the UI boundary.
+  const engagementResult = useMemo(
+    () => (isValid ? computeMoe(scenario) : null),
+    [scenario, isValid],
+  )
   const mcResult = useMemo(
     () =>
-      fidelity === 'montecarlo' && type === 'engagement'
+      isValid && fidelity === 'montecarlo' && type === 'engagement'
         ? runMonteCarlo(scenario, { trials, seed, uncertainty: { bearing_uniform: false } })
         : null,
-    [fidelity, type, scenario, trials, seed],
+    [fidelity, type, scenario, trials, seed, isValid],
   )
 
   const exportReport = (fmt: 'json' | 'md') => {
+    if (!isValid) return
     const report = buildReport(scenario, new Date().toISOString())
     const stamp = fileStamp(new Date())
     if (fmt === 'json') {
@@ -161,10 +174,22 @@ export default function AnalysisView({ onExit }: Props) {
             </a>
           </span>
           <span className="an-tb-group">
-            <button type="button" className="an-btn-ghost" onClick={() => exportReport('json')}>
+            <button
+              type="button"
+              className="an-btn-ghost"
+              onClick={() => exportReport('json')}
+              disabled={!isValid}
+              title={!isValid ? '입력 오류를 수정한 뒤 리포트를 저장할 수 있습니다.' : undefined}
+            >
               ↓ JSON
             </button>
-            <button type="button" className="an-btn-ghost" onClick={() => exportReport('md')}>
+            <button
+              type="button"
+              className="an-btn-ghost"
+              onClick={() => exportReport('md')}
+              disabled={!isValid}
+              title={!isValid ? '입력 오류를 수정한 뒤 리포트를 저장할 수 있습니다.' : undefined}
+            >
               ↓ 리포트(MD)
             </button>
           </span>
@@ -238,42 +263,40 @@ export default function AnalysisView({ onExit }: Props) {
             </div>
           )}
 
-          {/* Never let a result render as if it were sound when the inputs are not.
-              The left panel lists the specifics; this is the "don't trust this number" flag. */}
-          {(() => {
-            const errs = validateScenario(scenario).filter((i) => i.severity === 'error')
-            if (errs.length === 0) return null
-            return (
-              <div className="an-validation is-error">
-                <div className="an-validation-head">
-                  <span className="an-validation-tag">✕ 입력 오류 {errs.length}개</span>
-                  <span className="ab-small">
-                    아래 결과는 모델이 값을 강제로 클램프한 상태에서 계산된 것이라 신뢰할 수 없습니다 —
-                    좌측 패널에서 먼저 수정하세요.
-                  </span>
-                </div>
-                <ul className="an-validation-list">
-                  {errs.slice(0, 4).map((i) => (
-                    <li key={`${i.key}:${i.message}`} className="is-error">
-                      <b>{i.label}</b> — {i.message}
-                    </li>
-                  ))}
-                </ul>
+          {/* Parameter documentation remains available so users can understand
+              and repair an invalid field; every numerical analysis fails closed. */}
+          {!isValid && type !== 'reference' ? (
+            <div className="an-validation is-error">
+              <div className="an-validation-head">
+                <span className="an-validation-tag">✕ 입력 오류 {validationErrors.length}개 · 계산 중단</span>
+                <span className="ab-small">
+                  잘못된 값이 정상처럼 보이는 결과로 바뀌지 않도록 분석과 리포트 생성을 중단했습니다.
+                  좌측 패널에서 먼저 수정하세요.
+                </span>
               </div>
-            )
-          })()}
+              <ul className="an-validation-list">
+                {validationErrors.slice(0, 4).map((i) => (
+                  <li key={`${i.key}:${i.message}`} className="is-error">
+                    <b>{i.label}</b> — {i.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <>
+              {type === 'engagement' && engagementResult &&
+                (fidelity === 'analytical' || !mcResult ? (
+                  <MoeResultCards result={engagementResult} />
+                ) : (
+                  <McResults result={mcResult} />
+                ))}
 
-          {type === 'engagement' &&
-            (fidelity === 'analytical' || !mcResult ? (
-              <MoeResultCards result={engagementResult} />
-            ) : (
-              <McResults result={mcResult} />
-            ))}
-
-          {type === 'coverage' && <CoverageView scenario={scenario} />}
-          {type === 'trade' && <TradeView scenario={scenario} />}
-          {type === 'spec' && <SpecView scenario={scenario} />}
-          {type === 'compare' && <CompareView scenario={scenario} />}
+              {type === 'coverage' && <CoverageView scenario={scenario} />}
+              {type === 'trade' && <TradeView scenario={scenario} />}
+              {type === 'spec' && <SpecView scenario={scenario} />}
+              {type === 'compare' && <CompareView scenario={scenario} />}
+            </>
+          )}
           {type === 'reference' && <ReferenceView scenario={scenario} onExplain={setExplainKey} />}
         </div>
       </div>
