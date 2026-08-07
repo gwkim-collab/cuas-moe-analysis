@@ -1,5 +1,6 @@
 import {
   focalLengthMm,
+  paramExplain,
   paramInfo,
   pdHalfPointRange,
   validateScenario,
@@ -21,7 +22,15 @@ interface Props {
 // Meaning of a parameter (for the hover tooltip), from the doc registry.
 function hintFor(key: string): string | undefined {
   const info = paramInfo(key)
-  return info ? `${info.description}\n\n[출처] ${info.source}` : undefined
+  if (!info) return undefined
+  const ex = paramExplain(key)
+  return [
+    `[의미·동작] ${info.description}`,
+    ex?.theory ? `[이론 근거] ${ex.theory}` : undefined,
+    ex?.assumption ? `[모델 가정] ${ex.assumption}` : undefined,
+    `[값 출처] ${info.source}`,
+    'ⓘ 버튼에서 수식·상세 설명을 확인할 수 있습니다.',
+  ].filter(Boolean).join('\n\n')
 }
 
 // Small labelled numeric input. Hover shows the meaning; the ⓘ button
@@ -179,14 +188,13 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <legend>레이더 · SENSOR</legend>
         <NumField label="기준 RCS" unit="m²" value={s.ref_rcs_m2} step={0.001} paramKey="sensor.ref_rcs_m2" onExplain={onExplain} onChange={(v) => setSensor({ ref_rcs_m2: v })} />
         <NumField label="기준 탐지거리" unit="m" value={s.ref_detection_range_m} paramKey="sensor.ref_detection_range_m" onExplain={onExplain} onChange={(v) => setSensor({ ref_detection_range_m: v })} />
-        <NumField label="탐지거리 Pd" value={s.pd_at_ref} step={0.01} paramKey="sensor.pd_at_ref" onExplain={onExplain} onChange={(v) => setSensor({ pd_at_ref: v })} />
+        <NumField label="기준거리 단일스캔 Pd" value={s.pd_at_ref} step={0.01} paramKey="sensor.pd_at_ref" onExplain={onExplain} onChange={(v) => setSensor({ pd_at_ref: v })} />
         <p className="an-field-note ab-small" style={{ opacity: 0.7 }}>
           위 두 값이 레이더 정의: <b>"{s.ref_rcs_m2} m²를 {(s.ref_detection_range_m / 1000).toFixed(1)} km에서 Pd {s.pd_at_ref}로 탐지"</b>.
           내부 곡선 중심(Pd 50%)은 {pdHalfPointRange(s).toFixed(0)} m로 역산됩니다.
         </p>
         <NumField label="재방문 주기" unit="s" value={s.revisit_time_s} step={0.1} paramKey="sensor.revisit_time_s" onExplain={onExplain} onChange={(v) => setSensor({ revisit_time_s: v })} />
-        <NumField label="분류 시간" unit="s" value={s.classify_time_s} step={0.5} paramKey="sensor.classify_time_s" onExplain={onExplain} onChange={(v) => setSensor({ classify_time_s: v })} />
-        <NumField label="분류기 상한" value={s.classify_prob} step={0.01} paramKey="sensor.classify_prob" onExplain={onExplain} onChange={(v) => setSensor({ classify_prob: v })} />
+        <NumField label="레이더 트랙 유효 신뢰도" value={s.radar_track_confidence} step={0.01} paramKey="sensor.radar_track_confidence" onExplain={onExplain} onChange={(v) => setSensor({ radar_track_confidence: v })} />
         <details className="an-advanced">
           <summary className="ab-small">고급 · Pd 곡선 형태 (보통 만지지 않음)</summary>
           <NumField label="최대 Pd" value={s.pd_max} step={0.01} paramKey="sensor.pd_max" onExplain={onExplain} onChange={(v) => setSensor({ pd_max: v })} />
@@ -195,23 +203,28 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
       </fieldset>
 
       <fieldset className="an-group">
-        <legend>EO/IR 광학 · 인식</legend>
+        <legend>EO/IR 광학 · 종말 D/R/I</legend>
         <NumField label="화각 HFOV" unit="°" value={o.hfov_deg} step={0.1} paramKey="optics.hfov_deg" onExplain={onExplain} onChange={(v) => setOptics({ hfov_deg: v })} />
         <NumField label="가로 해상도" unit="px" value={o.h_resolution_px} step={10} paramKey="optics.h_resolution_px" onExplain={onExplain} onChange={(v) => setOptics({ h_resolution_px: v })} />
         <NumField label="센서 폭" unit="mm" value={o.sensor_width_mm} step={0.1} paramKey="optics.sensor_width_mm" onExplain={onExplain} onChange={(v) => setOptics({ sensor_width_mm: v })} />
-        <label className="an-field" title="교전 승인 기준(ROE) — 탐지(레이더 단독, EO 게이트 미적용) / 인식·식별(EO 게이트 적용, 해당 N50). 킬체인 구조가 바뀜">
-          <span className="an-field-label">요구 판별 수준 (교전 기준)</span>
+        <NumField label="EO 과업 완료 상대거리" unit="m" value={o.terminal_recognition_range_m} step={50} paramKey="optics.terminal_recognition_range_m" onExplain={onExplain} onChange={(v) => setOptics({ terminal_recognition_range_m: v })} />
+        <NumField label="EO 처리 시간" unit="s" value={s.classify_time_s} step={0.5} paramKey="sensor.classify_time_s" onExplain={onExplain} onChange={(v) => setSensor({ classify_time_s: v })} />
+        <NumField label="EO 과업 신뢰도 상한" value={s.classify_prob} step={0.01} paramKey="sensor.classify_prob" onExplain={onExplain} onChange={(v) => setSensor({ classify_prob: v })} />
+        <label className="an-field" title={'[정의] 레이더 추적만은 EO를 사용하지 않습니다. EO 탐지는 물체 존재, EO 인식은 표적 클래스(드론/조류·위협 유형), EO 식별은 특정 기종/모델 확인입니다.\n\n[동작] EO D/R/I는 모두 발사 후 시간선·획득·Johnson N50·대기투과 게이트를 적용합니다.\n\n[근거] Johnson D/R/I 50% 기준 · SAND2015-6368\n\n[값 출처] 운용 규칙/종말 확인 정책 입력값'}>
+          <span className="an-field-label">종말 확인 정책</span>
           <select
             value={o.required_discrimination}
             onChange={(ev) => setOptics({ required_discrimination: ev.target.value as DiscriminationLevel })}
           >
-            <option value="detection">탐지 (있다)</option>
-            <option value="recognition">인식 (드론/위협)</option>
-            <option value="identification">식별 (기종)</option>
+            <option value="radar_only">EO 미적용 (레이더 추적만)</option>
+            <option value="detection">EO 탐지 (물체 존재)</option>
+            <option value="recognition">EO 인식 (표적 클래스)</option>
+            <option value="identification">EO 식별 (특정 기종/모델)</option>
           </select>
         </label>
-        <NumField label="인식 N50" unit="px" value={o.n50_recognition} step={1} paramKey="optics.n50_recognition" onExplain={onExplain} onChange={(v) => setOptics({ n50_recognition: v })} />
-        <NumField label="식별 N50" unit="px" value={o.n50_identification} step={1} paramKey="optics.n50_identification" onExplain={onExplain} onChange={(v) => setOptics({ n50_identification: v })} />
+        <NumField label="EO 탐지 N50" unit="px" value={o.n50_detection} step={0.1} paramKey="optics.n50_detection" onExplain={onExplain} onChange={(v) => setOptics({ n50_detection: v })} />
+        <NumField label="EO 인식 N50" unit="px" value={o.n50_recognition} step={0.1} paramKey="optics.n50_recognition" onExplain={onExplain} onChange={(v) => setOptics({ n50_recognition: v })} />
+        <NumField label="EO 식별 N50" unit="px" value={o.n50_identification} step={0.1} paramKey="optics.n50_identification" onExplain={onExplain} onChange={(v) => setOptics({ n50_identification: v })} />
         <NumField label="레이더 큐 오차" unit="°" value={o.cue_error_deg} step={0.1} paramKey="optics.cue_error_deg" onExplain={onExplain} onChange={(v) => setOptics({ cue_error_deg: v })} />
         <NumField label="요격기 지향 오차" unit="°" value={o.pointing_error_deg} step={0.1} paramKey="optics.pointing_error_deg" onExplain={onExplain} onChange={(v) => setOptics({ pointing_error_deg: v })} />
         <NumField label="대기 시정" unit="km" value={o.visibility_km} step={0.5} paramKey="optics.visibility_km" onExplain={onExplain} onChange={(v) => setOptics({ visibility_km: v })} />
@@ -219,13 +232,13 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
           ≈ 초점거리 {focalLengthMm(o).toFixed(0)} mm (센서폭 {o.sensor_width_mm} mm 기준)
         </p>
         <p className="an-field-note ab-small" style={{ opacity: 0.7 }}>
-          ↑ 성능: 해상도·표적크기 · ↓ 성능(난이도↑): N50·화각. N50은 인식에 필요한 픽셀 수(문턱값).
+          상대거리는 발사 후 요격기 EO↔표적 LOS. 해상도·표적크기↑, N50↓는 유리합니다. 화각은 픽셀과 획득확률이 반대로 변해 최적점이 있습니다.
         </p>
       </fieldset>
 
       <fieldset className="an-group">
         <legend>이팩터 · EFFECTOR</legend>
-        <label className="an-field">
+        <label className="an-field" title={'[의미·동작] 선택한 페이로드의 단발 Pk만 누적 P_kill 계산에 사용합니다. 비선택 Pk는 보존되지만 결과에는 미사용입니다.\n\n[이론 근거] 독립 사격 누적 P_kill = 1−(1−p)^n\n\n[값 출처] 체계 구성 시나리오 입력값'}>
           <span className="an-field-label">페이로드</span>
           <select
             value={e.payload}
@@ -239,7 +252,7 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <NumField label="순항 속도" unit="m/s" value={e.cruise_speed_m_s} paramKey="effector.cruise_speed_m_s" onExplain={onExplain} onChange={(v) => setEffector({ cruise_speed_m_s: v })} />
         <NumField label="발사 개시 거리 (교리)" unit="m" value={e.commit_range_m} paramKey="effector.commit_range_m" onExplain={onExplain} onChange={(v) => setEffector({ commit_range_m: v })} />
         <p className="an-field-note ab-small" style={{ opacity: 0.7 }}>
-          이 거리에서 발사합니다. 일찍 탐지해도 더 일찍 쏘지 않고 <b>여유</b>만 늘어납니다 — 탐지가 늦을 때만 구속.
+          이 거리에서 발사합니다. 일찍 탐지해도 결정론적 발사 시점은 앞당기지 않지만, 적시 누적 탐지확률은 포화 전까지 높아질 수 있습니다.
         </p>
         <NumField label="요격기 도달 반경" unit="m" value={e.max_engagement_range_m} paramKey="effector.max_engagement_range_m" onExplain={onExplain} onChange={(v) => setEffector({ max_engagement_range_m: v })} />
         <NumField label="발사대 거리" unit="m" value={e.launch_pad_range_from_asset_m} paramKey="effector.launch_pad_range_from_asset_m" onExplain={onExplain} onChange={(v) => setEffector({ launch_pad_range_from_asset_m: v })} />
@@ -257,8 +270,7 @@ export default function AnalysisPanel({ scenario, onChange, onReset, onExplain }
         <legend>C2 · 결심</legend>
         <NumField label="결심 지연" unit="s" value={c.decision_latency_s} step={0.5} paramKey="c2.decision_latency_s" onExplain={onExplain} onChange={(v) => setC2({ decision_latency_s: v })} />
         <NumField label="결심 신뢰도" value={c.decision_reliability} step={0.01} paramKey="c2.decision_reliability" onExplain={onExplain} onChange={(v) => setC2({ decision_reliability: v })} />
-        <NumField label="결심-인식 커플링" value={c.decision_recognition_coupling} step={0.1} paramKey="c2.decision_recognition_coupling" onExplain={onExplain} onChange={(v) => setC2({ decision_recognition_coupling: v })} />
-        <label className="an-field" title="오교전(비위협 격추) 위험을 별도 지표로 계산 — P_negate와 무관, 필요할 때만 켜기">
+        <label className="an-field" title={'[의미·동작] 비위협 유입률×현재 판별수준의 오통과율로 오교전 위험을 별도 계산합니다. 실제 위협 P_negate에는 영향이 없습니다.\n\n[모델 가정] 오통과율은 EO/N50에서 유도되지 않는 독립 조건부 확률입니다.\n\n[값 출처] 분석 옵션 입력값'}>
           <span className="an-field-label">오교전 위험 모델</span>
           <select
             value={c.false_engagement_enabled ? 'on' : 'off'}

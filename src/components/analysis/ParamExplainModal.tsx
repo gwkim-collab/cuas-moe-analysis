@@ -68,15 +68,21 @@ export default function ParamExplainModal({ paramKey, scenario, onClose }: Props
           ) : null}
 
           <div className="an-modal-basis">
-            <div className="an-modal-src-label">근거</div>
+            <div className="an-modal-src-label">근거 · 가정 · 출처</div>
             {ex?.theory ? (
               <div className="an-basis-row"><span className="an-basis-tag t-theory">이론</span><span>{ex.theory}</span></div>
             ) : null}
             {ex?.assumption ? (
               <div className="an-basis-row"><span className="an-basis-tag t-assume">가정</span><span>{ex.assumption}</span></div>
             ) : null}
+            {ex?.references?.map((reference) => (
+              <div className="an-basis-row" key={reference.url}>
+                <span className="an-basis-tag t-theory">원문</span>
+                <a href={reference.url} target="_blank" rel="noreferrer">{reference.label}</a>
+              </div>
+            ))}
             <div className="an-basis-row">
-              <span className="an-basis-tag t-value">값</span>
+              <span className="an-basis-tag t-value">값 출처</span>
               <span className={/입력 필요/.test(info.source) ? 'an-basis-need' : undefined}>{info.source}</span>
             </div>
           </div>

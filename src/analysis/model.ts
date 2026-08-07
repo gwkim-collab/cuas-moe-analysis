@@ -12,10 +12,11 @@
 import type { PayloadMode } from '../types'
 
 /**
- * Johnson/NVESD discrimination task levels — each needs a different resolution
- * (its own N50). Detection < recognition < identification in difficulty.
+ * Terminal confirmation policy. `radar_only` explicitly means the onboard EO
+ * gate is disabled. The remaining three values are Johnson EO/IR tasks, ordered
+ * by required resolvable detail: detection < recognition < identification.
  */
-export type DiscriminationLevel = 'detection' | 'recognition' | 'identification'
+export type DiscriminationLevel = 'radar_only' | 'detection' | 'recognition' | 'identification'
 
 // ── Threat (incoming hostile UAS) ─────────────────────────────
 export interface ThreatSpec {
@@ -62,24 +63,28 @@ export interface SensorSpec {
   /** Scan revisit interval (s) — how often a fresh detection opportunity occurs. SME-VERIFY */
   revisit_time_s: number
   /**
-   * MINIMUM time to classify/confirm a track as hostile after first detection (s).
-   * It sets how far ahead of the commit range detection must happen
-   * (required_detection_range = commit + v_t·t_react); it does NOT by itself fix
-   * when classification concludes — that is back-solved from the launch point,
-   * so a doctrine-limited engagement classifies as LATE (= as close) as the
-   * decision timeline allows. SME-VERIFY
+   * Conditional probability that an already-detected radar track is stable and
+   * accurate enough to support the engagement declaration (0..1). This is not
+   * P_detect: P_detect answers whether a timely track was obtained at all.
+   * SME-VERIFY
+   */
+  radar_track_confidence: number
+  /**
+   * EO/IR processing time from onboard acquisition start to terminal
+   * detection/recognition/identification completion (s). This occurs AFTER interceptor
+   * launch and therefore does not belong to the pre-launch radar/C2 reaction
+   * budget. SME-VERIFY
    */
   classify_time_s: number
   /**
-   * Classifier ceiling (0..1): probability the target is correctly declared
-   * hostile GIVEN the EO/IR sensor resolves enough pixels on it. The final
-   * P_classify = recognitionProb(optics) × classify_prob, so this caps the
-   * algorithm/operator accuracy independent of optics. SME-VERIFY
+   * EO task reliability ceiling conditional on acquisition, resolvable detail,
+   * and atmospheric transmission (0..1). It represents residual
+   * algorithm/operator loss and is not the radar-track confidence. SME-VERIFY
    */
   classify_prob: number
 }
 
-// ── EO/IR optical sensor (recognition payload) ────────────────
+// ── EO/IR optical sensor (terminal D/R/I payload) ─────────────
 export interface OpticalSensorSpec {
   /** Horizontal resolution (pixels across the image). SME-VERIFY */
   h_resolution_px: number
@@ -88,17 +93,24 @@ export interface OpticalSensorSpec {
   /** Sensor width (mm) — used only for the focal-length ↔ FOV conversion display. */
   sensor_width_mm: number
   /**
-   * Johnson N50 (pixels on target for 50% task probability) for the EO tasks.
-   * Johnson's criteria give these in CYCLES (recognition ≈4.0, identification
-   * ≈6.4); here they are in PIXELS (≈ 2× cycles). recognition < identification.
-   * (Detection-grade N50 is not modelled: the 'detection' ROE is radar-only,
-   * so the EO is not used at all.) SME-VERIFY
+   * Interceptor-camera ↔ target relative LOS range (m) where the terminal EO
+   * selected detection/recognition/identification task completes. This is NOT asset↔target range.
+   * EO processing starts farther out by (v_i+v_t)·classify_time_s. SME-VERIFY
    */
+  terminal_recognition_range_m: number
+  /**
+   * Johnson N50 (pixels across the target critical dimension for 50% observer
+   * task probability). Literature values are cycles on target: detection≈1.0,
+   * recognition≈4.0, identification≈6.4. This model stores their nominal
+   * digital-image equivalents in pixels (≈2 pixels/cycle): 2, 8, 12.8 px.
+   * These are baseline criteria, not calibrated drone-classifier ROC values.
+   */
+  n50_detection: number
   n50_recognition: number
   n50_identification: number
   /**
-   * Engagement authorization basis (ROE): 'detection' = shoot on radar alone
-   * (no EO gate); 'recognition'/'identification' = EO must confirm at that level.
+   * Post-launch terminal confirmation requirement:
+   * radar_only=no EO gate; detection/recognition/identification=onboard EO task.
    */
   required_discrimination: DiscriminationLevel
   /**
@@ -164,18 +176,14 @@ export interface EffectorSpec {
 
 // ── C2 (decision layer) ───────────────────────────────────────
 export interface C2Spec {
-  /** Operator decision (approval) latency from CONFIRM to APPROVE (s). SME-VERIFY */
+  /** Pre-launch operator decision (approval) latency from radar track to APPROVE (s). SME-VERIFY */
   decision_latency_s: number
-  /** Probability the operator correctly approves engagement in the window (0..1). SME-VERIFY */
+  /** Probability the operator correctly approves launch in the pre-launch window (0..1). SME-VERIFY */
   decision_reliability: number
   /**
-   * 0..1 — how much poor EO recognition degrades the operator decision:
-   *   P_decision = reliability × (1 − coupling·(1 − recognition)).
-   * 0 = independent (P_decision = reliability, previous behaviour);
-   * 1 = fully coupled (decision no better than the image confidence).
-   * ⚠ recognition already gates P_classify, so coupling>0 adds a second,
-   * partly-correlated penalty — read it as the *extra human-judgment*
-   * sensitivity to a marginal image. SME-VERIFY.
+   * Legacy compatibility field. Onboard EO now occurs after launch, therefore
+   * it cannot couple back into the pre-launch approval probability and this
+   * value is not used by the analytical model.
    */
   decision_recognition_coupling: number
   /**
@@ -218,7 +226,7 @@ export const DEFAULT_THREAT: ThreatSpec = {
   speed_m_s: 32.8,
   altitude_m_agl: 85,
   // Analysis window start. Must sit comfortably OUTSIDE the required detection
-  // range (commit + v_t·t_react ≈ 3.66 km at defaults), otherwise the track
+  // range (commit + v_t·(decision+launch) ≈ 3.46 km at defaults), otherwise the track
   // begins inside the radar's reach and the detection margin cannot be shown.
   ingress_range_m: 6000,
   approach_bearing_deg: 315,
@@ -232,20 +240,23 @@ export const DEFAULT_SENSOR: SensorSpec = {
   pd_max: 0.98,
   pd_transition_width_m: 300,
   revisit_time_s: 1.0,
+  radar_track_confidence: 0.95, // P(valid fire-control track | timely detection)
   classify_time_s: 6.0,
-  classify_prob: 0.95, // classifier ceiling given enough pixels
+  classify_prob: 0.95, // EO algorithm/operator ceiling given the other EO gates
 }
 
 export const DEFAULT_OPTICS: OpticalSensorSpec = {
   h_resolution_px: 1920,
-  hfov_deg: 1.5, // narrow EO for recognition at range (NO gimbal — see cue/pointing error)
+  hfov_deg: 1.5, // narrow terminal EO (NO gimbal — see cue/pointing error)
   sensor_width_mm: 6.4,
-  // px ≈ 2× Johnson cycles (recognition 4.0 / identification 6.4).
-  // recognition kept at 6 px for baseline continuity — SME-VERIFY the cycle basis.
-  n50_recognition: 6,
-  n50_identification: 10,
+  terminal_recognition_range_m: 500, // onboard EO↔target relative LOS distance at selected task completion
+  // Nominal 50% Johnson criteria converted at ≈2 pixels per resolved cycle.
+  // Replace with task-specific test/ROC calibration when available.
+  n50_detection: 2,
+  n50_recognition: 8,
+  n50_identification: 12.8,
   required_discrimination: 'recognition',
-  // NOTE: a gimbal-less recognition-at-range concept only closes if the TOTAL
+  // NOTE: a gimbal-less D/R/I-at-range concept only closes if the TOTAL
   // pointing error stays sub-degree (√(cue²+point²) ≲ 0.5°); larger errors make
   // P_acq collapse for any FOV narrow enough to recognise the target. These are
   // aggressive design-target placeholders, NOT measured values — SME-VERIFY.
@@ -271,10 +282,10 @@ export const DEFAULT_EFFECTOR: EffectorSpec = {
 export const DEFAULT_C2: C2Spec = {
   decision_latency_s: 10,
   decision_reliability: 0.98,
-  decision_recognition_coupling: 0.5, // moderate coupling — SME-VERIFY (0 = independent)
+  decision_recognition_coupling: 0, // legacy field; post-launch EO cannot affect pre-launch approval
   false_engagement_enabled: false, // OPTION off by default — enable to model 오교전 risk
   non_threat_rate: 0.2, // 비위협 유입률 — SME-VERIFY
-  false_pass_detection: 0.8, // 레이더 단독은 비위협 오통과 높음 — SME-VERIFY
+  false_pass_detection: 0.8, // EO 미적용/EO 탐지는 비위협 오통과가 높다고 가정 — SME-VERIFY
   false_pass_recognition: 0.2, // EO 인식이 비위협 대부분 기각 — SME-VERIFY
   false_pass_identification: 0.05, // 식별은 거의 다 기각 — SME-VERIFY
 }

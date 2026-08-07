@@ -6,7 +6,8 @@
 //
 //   P_negate = P_detect · P_classify · P_decision · P_reach · P_kill
 //
-//   P_detect   — cumulative radar detection over the inbound track
+//   P_detect   — cumulative radar detection before the last range that still
+//                permits the doctrinal launch timeline
 //   P_classify — track correctly identified as hostile
 //   P_decision — operator approves engagement (in the window)
 //   P_reach    — interceptor closes on the threat outside keep-out,
@@ -23,10 +24,10 @@
 
 import type { Scenario, DiscriminationLevel } from './model'
 import { computeDetection, type DetectionResult } from './detection'
-import { reachSolution, type ReachSolution } from './kinematics'
+import { reachSolution, terminalEoSolution, timeBudget, type ReachSolution, type TerminalEoSolution } from './kinematics'
 import { effectorKillProbability, singleShotPk } from './engagement'
 import { pixelsOnTarget, recognitionProb, recognitionRangeForProb, acquisitionProb, pointingSigmaDeg, atmosphericTransmission } from './optics'
-import { clamp, slantRange } from './geometry'
+import { clamp } from './geometry'
 
 export interface MoeBreakdown {
   p_detect: number
@@ -36,15 +37,15 @@ export interface MoeBreakdown {
   p_kill: number
 }
 
-/** EO/IR optical recognition sub-result (drives P_classify). */
+/** EO/IR optical D/R/I sub-result (drives P_classify). */
 export interface OpticsBreakdown {
-  /** Range at which classification concludes (m). */
+  /** Interceptor-camera ↔ target relative LOS range where EO classification concludes (m). */
   classify_range_m: number
   /** Pixels on the target's critical dimension at the classify range. */
   pixels_on_target: number
-  /** Recognition probability from the Johnson curve (0..1). */
+  /** Selected EO D/R/I task probability from the Johnson curve (0..1). */
   recognition_prob: number
-  /** Range (m) at which recognition would be 50% for this target. */
+  /** Range (m) at which the selected Johnson task would be 50% for this target. */
   recognition_range_50_m: number
   /** Combined 1σ pointing error (deg) driving acquisition. */
   pointing_sigma_deg: number
@@ -52,7 +53,7 @@ export interface OpticsBreakdown {
   acquisition_prob: number
   /** Atmospheric transmission at the classify range (0..1). */
   atmospheric_transmission: number
-  /** Whether the EO gate is applied to P_classify (false for radar-only ROE). */
+  /** Whether the EO gate is applied to P_classify (false only for radar_only). */
   eo_gate_applied: boolean
   /** The ROE / discrimination level driving classification. */
   discrimination_level: DiscriminationLevel
@@ -67,10 +68,12 @@ export interface MoeResult {
   breakdown: MoeBreakdown
   /** Detection sub-result (ranges + cumulative Pd). */
   detection: DetectionResult
-  /** EO/IR recognition sub-result. */
+  /** EO/IR D/R/I sub-result. */
   optics: OpticsBreakdown
   /** Kinematics sub-result (timeline + intercept geometry + feasibility). */
   reach: ReachSolution
+  /** Post-launch onboard EO relative-range timeline. */
+  terminal_eo: TerminalEoSolution
   /** Single-shot kill probability used (payload dependent). */
   single_shot_pk: number
   /** Whether the engagement geometry is feasible at all. */
@@ -87,23 +90,29 @@ export interface MoeResult {
  * Pure — no side effects, no RNG.
  */
 export function computeMoe(s: Scenario): MoeResult {
-  const detection = computeDetection(s.sensor, s.threat, s.site.keep_out_radius_m)
+  const prelaunch = timeBudget(s)
+  const timelyDetectionCutoff =
+    s.effector.commit_range_m + s.threat.speed_m_s * prelaunch.react_total_s
+  const detection = computeDetection(
+    s.sensor,
+    s.threat,
+    s.site.keep_out_radius_m,
+    timelyDetectionCutoff,
+  )
   const reach = reachSolution(s, detection.detect_at_range_m)
+  const terminal_eo = terminalEoSolution(s, reach)
 
-  // EO/IR recognition · classification concludes at the range back-solved from
-  // the launch point (kinematics.classify_at_range_m) — as close, and therefore
-  // as sharp, as the decision timeline allows. Engagement is doctrine-driven, so
-  // detecting earlier moves this range NOT AT ALL until detection becomes the
-  // binding constraint. The EO sees the slant (LOS) range, so optics use
-  // √(horizontal² + altitude²).
-  const classify_range_m = slantRange(reach.classify_at_range_m, s.threat.altitude_m_agl)
+  // EO/IR D/R/I is an ONBOARD, POST-LAUNCH terminal gate. Its range is
+  // interceptor-camera ↔ target relative LOS separation, not asset↔target range.
+  // terminalEoSolution maps that separation back to both vehicles' asset ranges.
+  const classify_range_m = terminal_eo.recognition_separation_m
   const size = s.threat.characteristic_size_m
   const recognition_prob = recognitionProb(s.optics, size, classify_range_m)
   const acquisition_prob = acquisitionProb(s.optics)
   const atmospheric_transmission = atmosphericTransmission(s.optics, classify_range_m)
-  // Engagement authorization (ROE): EO gate applies unless shooting on radar
-  // detection alone. (Detail below where p_classify is formed.)
-  const eo_gate_applied = s.optics.required_discrimination !== 'detection'
+  // Terminal confirmation requirement: radar_only skips the onboard EO gate;
+  // EO detection/recognition/identification all require the post-launch result.
+  const eo_gate_applied = s.optics.required_discrimination !== 'radar_only'
   const optics = {
     classify_range_m,
     pixels_on_target: pixelsOnTarget(s.optics, size, classify_range_m),
@@ -116,33 +125,25 @@ export function computeMoe(s: Scenario): MoeResult {
     discrimination_level: s.optics.required_discrimination,
   }
 
-  const p_detect = clamp(detection.cumulative_pd, 0, 1)
+  const p_detect = clamp(detection.cumulative_pd_in_time, 0, 1)
 
-  // Engagement authorization (ROE) = required_discrimination:
-  //  · 'detection'   — shoot on radar detection ALONE. The EO is not required to
-  //    authorize the shot, so the EO gate (acquisition · recognition · atmospheric)
-  //    is NOT applied; P_classify is just the declaration confidence ceiling.
-  //  · 'recognition'/'identification' — EO must recognise/identify before approval,
-  //    so the full EO gate applies (that level's N50 lives inside recognition_prob).
-  // → 전략이 킬체인 구조를 바꾼다: 느슨한 ROE(탐지)는 P_classify가 높아지지만(실제
-  //   위협 무력화 확률↑) 오교전(민간·오인) 위험은 별도로 커진다(현 모델 미반영).
-  // P_classify — EO gate only when the ROE requires EO confirmation.
-  const p_classify = clamp(
+  // Terminal discrimination requirement:
+  //  · 'radar_only' — launch and continue on the radar track; no EO success gate.
+  //  · EO D/R/I — the interceptor must finish the selected onboard task after
+  //    launch and before intercept.
+  const p_classify_optical = clamp(
     eo_gate_applied
       ? acquisition_prob * recognition_prob * atmospheric_transmission * s.sensor.classify_prob
-      : s.sensor.classify_prob,
+      : s.sensor.radar_track_confidence,
     0,
     1,
   )
-  // Operator decision. When the shot rides on EO (recognition/identification), a
-  // marginal image also degrades human approval (coupling). On radar-only
-  // engagement the decision is not tied to EO recognition → no coupling.
-  const decision_coupling = eo_gate_applied ? clamp(s.c2.decision_recognition_coupling, 0, 1) : 0
-  const p_decision = clamp(
-    s.c2.decision_reliability * (1 - decision_coupling * (1 - recognition_prob)),
-    0,
-    1,
-  )
+  // A requested EO completion point that would require processing before launch
+  // cannot contribute a plausible terminal-confirmation probability.
+  const p_classify = eo_gate_applied && !terminal_eo.timing_feasible ? 0 : p_classify_optical
+  // Launch approval occurs before the interceptor's EO task, so it cannot be
+  // degraded by an image that is produced later in the flight.
+  const p_decision = clamp(s.c2.decision_reliability, 0, 1)
   // Continuous reach (softened by margin σ, 0 if geometry hard-fails). Kill is
   // the effector's own cumulative Pk; the product handles the soft gating.
   const p_reach = clamp(reach.reach_probability, 0, 1)
@@ -156,8 +157,9 @@ export function computeMoe(s: Scenario): MoeResult {
 
   // OPTION — wrong-engagement risk (separate from p_negate). A non-threat is
   // engaged if it enters the track pool AND passes the current ROE gate; looser
-  // ROE (detection) lets more non-threats through.
+  // ROE (radar-only / detection) lets more non-threats through.
   const false_pass = {
+    radar_only: s.c2.false_pass_detection,
     detection: s.c2.false_pass_detection,
     recognition: s.c2.false_pass_recognition,
     identification: s.c2.false_pass_identification,
@@ -173,8 +175,9 @@ export function computeMoe(s: Scenario): MoeResult {
     detection,
     optics,
     reach,
+    terminal_eo,
     single_shot_pk: singleShotPk(s.effector),
-    feasible: reach.feasible,
+    feasible: reach.feasible && (!eo_gate_applied || terminal_eo.timing_feasible),
     false_engagement,
   }
 }

@@ -4,7 +4,9 @@
 // Radar-range scaling: the classic radar equation gives maximum
 // detection range R_max ∝ (RCS)^(1/4) for a fixed detection
 // threshold. So a target with RCS different from the sensor's
-// quoted reference scales its detection range by (rcs/ref)^0.25.
+// quoted reference shifts the logistic Pd curve centre by
+// (rcs/ref)^0.25. The transition width remains fixed, so a range quoted
+// at an arbitrary Pd does not necessarily scale by exactly that factor.
 //
 // Single-look detection probability is modelled as a logistic that
 // is ~pd_max well inside range and rolls off through 0.5·pd_max at
@@ -43,9 +45,9 @@ export function pdHalfPointRange(sensor: SensorSpec): number {
 }
 
 /**
- * Logistic centre (m) for an arbitrary RCS. The radar equation scales the whole
- * curve by (rcs/ref)^¼; the transition width `w` is held fixed (the curve
- * translates, its shape is preserved) — a modelling simplification.
+ * Logistic centre (m) for an arbitrary RCS. The radar equation scales the
+ * centre by (rcs/ref)^¼; the transition width `w` is held fixed, so the curve
+ * translates without scaling its width — a modelling simplification.
  */
 export function detectionRangeForRcs(sensor: SensorSpec, rcs_m2: number): number {
   const ratio = rcs_m2 / sensor.ref_rcs_m2
@@ -86,8 +88,19 @@ export interface DetectionResult {
    * RCS equals the reference RCS. This is the number to quote to a human.
    */
   quoted_range_m: number
-  /** Cumulative probability of detection over the whole inbound track (0..1). */
-  cumulative_pd: number
+  /**
+   * Probability of at least one detection before the last range that still
+   * allows the doctrinal launch timeline (0..1). This is the P_detect gate.
+   */
+  cumulative_pd_in_time: number
+  /** Probability of at least one detection anywhere before keep-out (reference only). */
+  cumulative_pd_before_keep_out: number
+  /** Success deadline used for cumulative_pd_in_time (asset-relative ground range, m). */
+  timely_cutoff_range_m: number
+  /** Number of independent scheduled looks at or outside the success deadline. */
+  looks_in_time: number
+  /** Number of independent scheduled looks over the full ingress→keep-out track. */
+  looks_before_keep_out: number
   /**
    * Range from asset (m) at which the track is effectively "detected" for the
    * timeline — the first inbound range whose single-look pd ≥ 0.5. Used as the
@@ -105,11 +118,16 @@ export function computeDetection(
   sensor: SensorSpec,
   threat: ThreatSpec,
   keep_out_radius_m: number,
+  timely_cutoff_range_m = keep_out_radius_m,
 ): DetectionResult {
   const nominal = detectionRangeForRcs(sensor, threat.rcs_m2)
   const step_m = Math.max(1, threat.speed_m_s * sensor.revisit_time_s)
+  const cutoff = Math.max(keep_out_radius_m, timely_cutoff_range_m)
 
-  let survivalMiss = 1 // Π(1 − pd_i)
+  let survivalMissInTime = 1 // Π(1 − pd_i), only while launch doctrine is still attainable
+  let survivalMissBeforeKeepOut = 1 // Π(1 − pd_i), full track reference
+  let looksInTime = 0
+  let looksBeforeKeepOut = 0
   let detectAt = nominal
   let foundDetect = false
 
@@ -123,7 +141,12 @@ export function computeDetection(
   ) {
     const slant = slantRange(range, threat.altitude_m_agl)
     const pd = pdAtRange(sensor, threat.rcs_m2, slant)
-    survivalMiss *= 1 - pd
+    survivalMissBeforeKeepOut *= 1 - pd
+    looksBeforeKeepOut += 1
+    if (range >= cutoff) {
+      survivalMissInTime *= 1 - pd
+      looksInTime += 1
+    }
     if (!foundDetect && pd >= 0.5) {
       detectAt = range
       foundDetect = true
@@ -133,7 +156,11 @@ export function computeDetection(
   return {
     nominal_range_m: nominal,
     quoted_range_m: rangeForPd(sensor, threat.rcs_m2, sensor.pd_at_ref),
-    cumulative_pd: clamp(1 - survivalMiss, 0, 1),
+    cumulative_pd_in_time: clamp(1 - survivalMissInTime, 0, 1),
+    cumulative_pd_before_keep_out: clamp(1 - survivalMissBeforeKeepOut, 0, 1),
+    timely_cutoff_range_m: cutoff,
+    looks_in_time: looksInTime,
+    looks_before_keep_out: looksBeforeKeepOut,
     detect_at_range_m: detectAt,
   }
 }

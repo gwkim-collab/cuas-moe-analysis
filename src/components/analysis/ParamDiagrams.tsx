@@ -13,6 +13,7 @@ import {
   pdAtRange,
   recognitionProb,
   recognitionRangeForProb,
+  activeN50,
   acquisitionProb,
   singleShotPk,
   computeDetection,
@@ -181,13 +182,20 @@ const CumulativePd: FC<DiagramProps> = ({ scenario }) => {
   const keepOut = scenario.site.keep_out_radius_m
   const step = Math.max(1, t.speed_m_s * s.revisit_time_s)
   const start = Math.max(t.ingress_range_m, keepOut + step)
+  const timelyCutoff = Math.max(
+    keepOut,
+    scenario.effector.commit_range_m +
+      t.speed_m_s * (scenario.c2.decision_latency_s + scenario.effector.launch_delay_s),
+  )
   const pts: Array<[number, number]> = []
   const dots: Array<[number, number]> = []
   let miss = 1
   let n = 0
+  let timely = 0
   for (let r = start; r >= keepOut; r -= step) {
-    miss *= 1 - pdAtRange(s, t.rcs_m2, r)
+    miss *= 1 - pdAtRange(s, t.rcs_m2, Math.hypot(r, t.altitude_m_agl))
     const cum = 1 - miss
+    if (r >= timelyCutoff) timely = cum
     pts.push([r, cum])
     if (n % Math.ceil((start - keepOut) / step / 24 + 1) === 0) dots.push([r, cum])
     n++
@@ -196,22 +204,33 @@ const CumulativePd: FC<DiagramProps> = ({ scenario }) => {
   const sx = scale(start, keepOut, L, L + PW)
   const sy = scale(0, 1, T + PH, T)
   const final = pts.length ? pts[pts.length - 1][1] : 0
+  const cutoffX = sx(Math.min(start, timelyCutoff))
   return (
     <Frame xLabel="거리 r (m) · 접근→" yLabel="누적 P_det">
       <ProbGrid sy={sy} />
       <path d={polyline(pts, (x) => sx(x), (y) => sy(y))} fill="none" stroke={CURVE} strokeWidth={2} />
+      <line x1={cutoffX} y1={T} x2={cutoffX} y2={T + PH} stroke={MARK} strokeDasharray="3 3" />
+      <text x={cutoffX} y={T + PH + 14} fill={MARK} fontSize={9.5} textAnchor="middle">적시 마감 {fmt(timelyCutoff)}</text>
       {dots.map(([x, y], i) => (
         <circle key={i} cx={sx(x)} cy={sy(y)} r={2} fill={CURVE} />
       ))}
       <text x={L + PW} y={T + 12} fill={TXT} fontSize={11} textAnchor="end">Δr = {fmt(step)} m/스캔</text>
-      <text x={L + PW - 2} y={sy(final) - 6} fill={TXT} fontSize={11} textAnchor="end">누적 {(final * 100).toFixed(1)}%</text>
+      <text x={L + PW - 2} y={T + 26} fill={TXT} fontSize={10.5} textAnchor="end">
+        적시 {(timely * 100).toFixed(5)}% · 전체 {(final * 100).toFixed(3)}%
+      </text>
     </Frame>
   )
 }
 
-// ── 4) Johnson recognition prob vs range ──────────────────────
-const JohnsonN50: FC<DiagramProps> = ({ scenario }) => {
-  const o = scenario.optics
+// ── 4) Johnson selected D/R/I task probability vs range ──────
+const JohnsonN50: FC<DiagramProps> = ({ scenario, paramKey }) => {
+  const level = paramKey === 'optics.n50_detection'
+    ? 'detection'
+    : paramKey === 'optics.n50_identification'
+      ? 'identification'
+      : 'recognition'
+  const taskName = level === 'detection' ? '탐지' : level === 'identification' ? '식별' : '인식'
+  const o = { ...scenario.optics, required_discrimination: level } as Scenario['optics']
   const size = scenario.threat.characteristic_size_m
   const r50 = recognitionRangeForProb(o, size, 0.5)
   const xMax = Number.isFinite(r50) && r50 > 0 ? r50 * 1.9 : 5000
@@ -222,11 +241,11 @@ const JohnsonN50: FC<DiagramProps> = ({ scenario }) => {
     const r = (xMax * i) / 100
     const p = recognitionProb(o, size, r)
     // r→0 makes pixels-on-target diverge (Johnson → NaN); the target then
-    // fills the frame, i.e. recognition ≈ 1.
+    // fills the frame, i.e. task probability ≈ 1.
     pts.push([r, Number.isFinite(p) ? p : 1])
   }
   return (
-    <Frame xLabel="거리 r (m)" yLabel="인식확률 P">
+    <Frame xLabel="거리 r (m)" yLabel={`${taskName}확률 P`}>
       <ProbGrid sy={sy} />
       {Number.isFinite(r50) && (
         <>
@@ -235,7 +254,7 @@ const JohnsonN50: FC<DiagramProps> = ({ scenario }) => {
         </>
       )}
       <path d={polyline(pts, (x) => sx(x), (y) => sy(y))} fill="none" stroke={CURVE} strokeWidth={2} />
-      <text x={L + PW} y={T + 12} fill={TXT} fontSize={11} textAnchor="end">N50 = {fmt(o.n50_recognition)} px</text>
+      <text x={L + PW} y={T + 12} fill={TXT} fontSize={11} textAnchor="end">{taskName} N50 = {fmt(activeN50(o) ?? 0)} px</text>
     </Frame>
   )
 }
@@ -367,9 +386,9 @@ const ACQ = '#ffcf6b'
 const FovAcquisition: FC<DiagramProps> = ({ scenario }) => {
   const o = scenario.optics
   const size = scenario.threat.characteristic_size_m
-  const det = computeDetection(scenario.sensor, scenario.threat, scenario.site.keep_out_radius_m)
-  // Same range the kill chain classifies at — back-solved from the launch point.
-  const classifyRange = reachSolution(scenario, det.detect_at_range_m).classify_at_range_m
+  // Onboard EO is evaluated at the configured camera↔target relative LOS
+  // completion separation, not an asset-relative pre-launch range.
+  const terminalRange = o.terminal_recognition_range_m
   const lo = 0.3
   const hi = 40
   const lx = (v: number) => Math.log10(v)
@@ -383,7 +402,7 @@ const FovAcquisition: FC<DiagramProps> = ({ scenario }) => {
     const h = Math.pow(10, lx(lo) + ((lx(hi) - lx(lo)) * i) / 100)
     const oo = { ...o, hfov_deg: h }
     const acq = acquisitionProb(oo)
-    const rec = recognitionProb(oo, size, classifyRange)
+    const rec = recognitionProb(oo, size, terminalRange)
     const prod = acq * rec
     acqPts.push([lx(h), acq])
     recPts.push([lx(h), rec])

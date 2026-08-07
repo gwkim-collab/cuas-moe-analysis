@@ -1,14 +1,14 @@
 // ────────────────────────────────────────────────────────────
-// Analysis core · EO/IR optical recognition model.
+// Analysis core · EO/IR optical discrimination model.
 //
-// Links camera geometry to recognition probability so the classify
+// Links camera geometry to task probability so the classify
 // stage (P_classify) becomes a physical function of target size,
 // range, camera field-of-view and sensor resolution — the thing you
 // actually trade when sizing an EO/IR recognition payload.
 //
 //   pixels on target   N = size_m / (range_m · IFOV)
 //                        = size_m · H_px / (range_m · HFOV_rad)
-//   recognition prob   Johnson/NVESD curve of n = N / N50:
+//   task probability   Johnson/NVESD curve of n = N / N50_task:
 //                        P = n^E / (1 + n^E),  E = 2.7 + 0.7·n
 //
 // FOV ↔ focal length:  HFOV = 2·atan(sensor_width / (2·focal_length))
@@ -47,22 +47,28 @@ export function johnsonProb(n: number): number {
 }
 
 /**
- * N50 (px) for the currently required EO task. 'detection' ROE is radar-only
- * (EO unused), so it falls back to the recognition N50 for the informational
- * readout only — it never gates P_classify under detection.
+ * N50 (px) for the selected EO task. `radar_only` has no EO task and therefore
+ * returns null instead of silently borrowing the EO-detection threshold.
  */
-export function activeN50(o: OpticalSensorSpec): number {
-  return o.required_discrimination === 'identification' ? o.n50_identification : o.n50_recognition
+export function activeN50(o: OpticalSensorSpec): number | null {
+  switch (o.required_discrimination) {
+    case 'identification': return o.n50_identification
+    case 'recognition': return o.n50_recognition
+    case 'detection': return o.n50_detection
+    case 'radar_only': return null
+  }
 }
 
 /**
  * Task probability at `range_m` for the REQUIRED discrimination level (its
- * own Johnson N50). Named recognitionProb for continuity, but it honours
- * required_discrimination (detection / recognition / identification).
+ * own Johnson N50). Named recognitionProb for API continuity; it evaluates the
+ * selected EO detection / recognition / identification task.
  */
 export function recognitionProb(o: OpticalSensorSpec, size_m: number, range_m: number): number {
+  const n50 = activeN50(o)
+  if (n50 == null) return 1 // neutral factor: no EO task is requested
   const N = pixelsOnTarget(o, size_m, range_m)
-  return clamp(johnsonProb(N / activeN50(o)), 0, 1)
+  return clamp(johnsonProb(N / n50), 0, 1)
 }
 
 /**
@@ -72,6 +78,8 @@ export function recognitionProb(o: OpticalSensorSpec, size_m: number, range_m: n
  * which recognition ≥ prob (larger range = harder = fewer pixels).
  */
 export function recognitionRangeForProb(o: OpticalSensorSpec, size_m: number, prob: number): number {
+  const n50 = activeN50(o)
+  if (n50 == null) return Infinity // no EO task ⇒ no finite Johnson threshold range
   const p = clamp(prob, 1e-4, 0.9999)
   // Find n such that johnsonProb(n) = p (monotone increasing in n).
   let lo = 0
@@ -82,7 +90,7 @@ export function recognitionRangeForProb(o: OpticalSensorSpec, size_m: number, pr
     else hi = mid
   }
   const n = (lo + hi) / 2
-  const N = n * activeN50(o)
+  const N = n * n50
   if (N <= 0) return Infinity
   // N = size / (range · IFOV) → range = size / (N · IFOV)
   return size_m / (N * ifovRad(o))
@@ -98,7 +106,8 @@ export function pointingSigmaDeg(o: OpticalSensorSpec): number {
  * FIXED (gimbal-less) camera FOV. With 2D Gaussian pointing error of per-axis
  * σ, the radial angular offset is Rayleigh-distributed, so the probability of
  * being within a circular half-angle a = HFOV/2 is 1 − exp(−a²/(2σ²)).
- * Horizontal half-angle is used (conservative for wider-than-tall frames).
+ * Horizontal half-angle is used because VFOV is not modelled; for a rectangular
+ * frame the bias direction is not guaranteed and can be optimistic.
  *
  * This is the term that penalises a narrow FOV: fewer degrees of coverage →
  * the target is more likely to fall outside the frame. Combined with the

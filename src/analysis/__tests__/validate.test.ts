@@ -113,6 +113,28 @@ describe('cross-parameter validation', () => {
     expect(validateScenario(s).some((i) => i.key === 'optics.n50_recognition')).toBe(true)
   })
 
+  it('warns when EO detection N50 exceeds recognition N50', () => {
+    const s = scn()
+    s.optics.n50_detection = 12
+    s.optics.n50_recognition = 8
+    expect(validateScenario(s).some((i) => i.key === 'optics.n50_detection')).toBe(true)
+  })
+
+  it('rejects an EO completion separation that would require processing before launch', () => {
+    const s = scn()
+    s.optics.terminal_recognition_range_m = 2800
+    const hit = validateScenario(s).find((i) => i.key === 'optics.terminal_recognition_range_m')
+    expect(hit?.severity).toBe('error')
+    expect(hit?.suggestion).toBeLessThan(2800)
+  })
+
+  it('does not apply the onboard EO timing constraint in radar-only mode', () => {
+    const s = scn()
+    s.optics.required_discrimination = 'radar_only'
+    s.optics.terminal_recognition_range_m = 40000
+    expect(validateScenario(s).some((i) => i.key === 'optics.terminal_recognition_range_m')).toBe(false)
+  })
+
   it('errors sort ahead of warnings', () => {
     const s = scn()
     s.threat.ingress_range_m = 2000 // warn
@@ -162,10 +184,10 @@ describe('Monte Carlo sampling bounds', () => {
     expect(failures + Math.round(r.negated_fraction * r.trials)).toBe(r.trials)
   })
 
-  it('a gate at probability 1 is never the first failure', () => {
-    // P_detect saturates at 100% by default → detection can never be the culprit.
+  it('timely detection can appear as the first failure under sampled uncertainty', () => {
     const r = runMonteCarlo(scn(), { trials: 2000, seed: 3 })
-    expect(r.gate_failure_counts.detect).toBe(0)
+    expect(r.gate_failure_counts.detect).toBeGreaterThan(0)
+    expect(r.gate_failure_counts.detect).toBeLessThan(r.trials)
   })
 
   it('outcome-based negation tracks the analytic mean', () => {

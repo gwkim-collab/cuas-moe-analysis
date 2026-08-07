@@ -13,6 +13,9 @@ const SAVED_PREFIX = 'saved:'
 function pct(x: number): string {
   return Number.isFinite(x) ? `${(x * 100).toFixed(1)}%` : '—'
 }
+function pctDetect(x: number): string {
+  return Number.isFinite(x) && x > 0.999 && x < 1 ? `${(x * 100).toFixed(5)}%` : pct(x)
+}
 function m(x: number): string {
   return Number.isFinite(x) ? `${x.toFixed(0)} m` : '—'
 }
@@ -52,14 +55,14 @@ export default function CompareView({ scenario }: Props) {
 
   const rows: Row[] = [
     { label: 'P_negate · 무력화', a: a.p_negate, b: b.p_negate, fmt: pct, higherBetter: true },
-    { label: 'P_detect · 탐지', a: a.breakdown.p_detect, b: b.breakdown.p_detect, fmt: pct, higherBetter: true },
-    { label: 'P_classify · 분류', a: a.breakdown.p_classify, b: b.breakdown.p_classify, fmt: pct, higherBetter: true },
+    { label: 'P_detect · 적시 탐지', a: a.breakdown.p_detect, b: b.breakdown.p_detect, fmt: pctDetect, higherBetter: true },
+    { label: 'P_terminal · 종말 확인', a: a.breakdown.p_classify, b: b.breakdown.p_classify, fmt: pct, higherBetter: true },
     { label: 'P_decision · 결심', a: a.breakdown.p_decision, b: b.breakdown.p_decision, fmt: pct, higherBetter: true },
     { label: 'P_reach · 도달', a: a.breakdown.p_reach, b: b.breakdown.p_reach, fmt: pct, higherBetter: true },
     { label: 'P_kill · 살상', a: a.breakdown.p_kill, b: b.breakdown.p_kill, fmt: pct, higherBetter: true },
     { label: '획득 P_acq', a: a.optics.acquisition_prob, b: b.optics.acquisition_prob, fmt: pct, higherBetter: true },
-    { label: '인식 확률', a: a.optics.recognition_prob, b: b.optics.recognition_prob, fmt: pct, higherBetter: true },
-    { label: '분류 완료 거리', a: a.optics.classify_range_m, b: b.optics.classify_range_m, fmt: m, higherBetter: true },
+    { label: 'Johnson 선택 과업 확률', a: a.optics.recognition_prob, b: b.optics.recognition_prob, fmt: pct, higherBetter: true },
+    { label: 'EO 완료 상대거리', a: a.optics.classify_range_m, b: b.optics.classify_range_m, fmt: m, higherBetter: false },
     { label: '요격 거리', a: a.reach.intercept_range_m, b: b.reach.intercept_range_m, fmt: m, higherBetter: true },
     { label: 'Keep-out 여유', a: a.reach.margin_m, b: b.reach.margin_m, fmt: m, higherBetter: true },
   ]

@@ -55,9 +55,19 @@ function pct(x: number): string {
   return `${(x * 100).toFixed(1)}%`
 }
 
+function pctPrecise(x: number): string {
+  if ((x > 0 && x < 0.001) || (x > 0.999 && x < 1)) return `${(x * 100).toFixed(5)}%`
+  return pct(x)
+}
+
 export function reportToMarkdown(report: AnalysisReport): string {
   const { scenario: s, engagement: e, coverage: c } = report
   const b = e.breakdown
+  const eoTaskName = e.optics.discrimination_level === 'detection' || e.optics.discrimination_level === 'radar_only'
+    ? '탐지'
+    : e.optics.discrimination_level === 'identification'
+      ? '식별'
+      : '인식'
   const lines: string[] = []
   lines.push('# AIRLOCK 효과도 분석 리포트')
   lines.push('')
@@ -70,9 +80,10 @@ export function reportToMarkdown(report: AnalysisReport): string {
   lines.push('|---|---|')
   lines.push(`| **P_negate (무력화 확률)** | **${pct(e.p_negate)}** |`)
   lines.push(`| Leakage (누수) | ${pct(e.leakage)} |`)
-  lines.push(`| 교전 성립 | ${e.feasible ? '성립' : '불성립'}${e.feasible ? '' : ` (${e.reach.reason})`} |`)
-  lines.push(`| P_detect · 탐지 | ${pct(b.p_detect)} |`)
-  lines.push(`| P_classify · 분류 | ${pct(b.p_classify)} |`)
+  const infeasibleReason = !e.reach.feasible ? e.reach.reason : e.terminal_eo.reason
+  lines.push(`| 교전 성립 | ${e.feasible ? '성립' : '불성립'}${e.feasible ? '' : ` (${infeasibleReason})`} |`)
+  lines.push(`| P_detect · 적시 탐지 | ${pctPrecise(b.p_detect)} |`)
+  lines.push(`| ${e.optics.eo_gate_applied ? `P_terminal EO · EO ${eoTaskName}` : 'P_terminal · 레이더 트랙 유효 신뢰도'} | ${pct(b.p_classify)} |`)
   lines.push(`| P_decision · 결심 | ${pct(b.p_decision)} |`)
   lines.push(`| P_reach · 도달 | ${pct(b.p_reach)} |`)
   lines.push(`| P_kill · 살상 | ${pct(b.p_kill)} |`)
@@ -84,16 +95,22 @@ export function reportToMarkdown(report: AnalysisReport): string {
   lines.push('### 1-1. 탐지 요구 충족 여부')
   lines.push('')
   lines.push(
-    '> 교전은 교리(발사 개시 거리)로 개시됩니다. 탐지는 반응 예산을 그 거리 앞에서 소화할 수 있을 때만 무해하며, ' +
-      '필요치를 넘는 탐지 성능은 **여유만 늘리고 P_negate를 올리지 않습니다.**',
+    '> P_detect는 keep-out 전 언젠가 탐지할 확률이 아니라, 결심+발사 지연을 남겨 두고 교리상 발사거리를 지킬 수 있는 ' +
+      '**필요 탐지거리까지의 누적 탐지확률**입니다.',
   )
   lines.push('')
   lines.push('| 지표 | 값 |')
   lines.push('|---|---|')
+  lines.push(`| P_detect · 적시 누적 | ${pctPrecise(e.detection.cumulative_pd_in_time)} |`)
+  lines.push(`| 적시 미탐지 위험 | ${pctPrecise(1 - e.detection.cumulative_pd_in_time)} |`)
+  lines.push(`| 적시 탐지 마감선 | ${e.detection.timely_cutoff_range_m.toFixed(0)} m |`)
+  lines.push(`| 적시 / 전체 독립 스캔 | ${e.detection.looks_in_time} / ${e.detection.looks_before_keep_out} 회 |`)
+  lines.push(`| Keep-out 전 누적 탐지 (참고) | ${pctPrecise(e.detection.cumulative_pd_before_keep_out)} |`)
   lines.push(`| 탐지 시점 거리 | ${e.reach.detect_at_range_m.toFixed(0)} m |`)
   lines.push(
     `| 필요 탐지거리 (= 발사개시 + v_t·반응예산) | ${e.reach.required_detection_range_m.toFixed(0)} m |`,
   )
+  lines.push(`| 발사 전 반응 예산 (= 결심+발사) | ${e.reach.budget.react_total_s.toFixed(1)} s |`)
   lines.push(
     `| 탐지 여유 | ${e.reach.detection_margin_m.toFixed(0)} m · ${e.reach.detection_margin_s.toFixed(1)} s |`,
   )
@@ -101,19 +118,30 @@ export function reportToMarkdown(report: AnalysisReport): string {
     `| 판정 | ${e.reach.detection_limited ? '⚠ **탐지 제약** — 교리상 발사 개시 거리를 지키지 못함' : '✓ 교리 지배 — 탐지 충분'} |`,
   )
   lines.push('')
-  lines.push('## 2. EO/IR 인식 · 획득 (P_classify 구성)')
+  lines.push(`## 2. ${e.optics.eo_gate_applied ? `발사 후 EO/IR ${eoTaskName} · 획득` : 'EO 미적용 · 광학 참고값'}`)
   lines.push('')
-  lines.push('> P_classify = 획득 P_acq × Johnson 인식확률 × 대기투과 × 분류기 상한 (짐벌 없음 · 고정 FOV)')
+  lines.push(e.optics.eo_gate_applied
+    ? '> AB-U10을 발사한 뒤 탑재 카메라와 표적의 상대 LOS 거리로 계산합니다. 자산↔표적 거리가 아닙니다.'
+    : '> 종말 확인 정책이 EO 미적용(레이더 추적만)입니다. 아래 광학 수치는 참고값이며 P_terminal에 사용하지 않습니다.')
+  lines.push(e.optics.eo_gate_applied
+    ? `> P_terminal EO = 획득 P_acq × Johnson ${eoTaskName}확률 × 대기투과 × EO 과업 신뢰도 상한 (짐벌 없음 · 고정 FOV)`
+    : '> P_terminal = P(교전 유효 트랙 | 적시 탐지) · 레이더 트랙 유효 신뢰도')
   lines.push('')
   lines.push('| 지표 | 값 |')
   lines.push('|---|---|')
-  lines.push(`| 분류 완료 거리 (LOS 경사거리) | ${e.optics.classify_range_m.toFixed(0)} m |`)
+  lines.push(`| 발사 시 EO–표적 상대거리 | ${e.terminal_eo.separation_at_launch_m.toFixed(0)} m |`)
+  lines.push(`| EO 처리 시작 상대거리 | ${e.terminal_eo.processing_start_separation_m.toFixed(0)} m |`)
+  lines.push(`| EO ${eoTaskName} 완료 상대거리 | ${e.optics.classify_range_m.toFixed(0)} m |`)
+  lines.push(`| EO 처리 시간 | ${s.sensor.classify_time_s.toFixed(1)} s |`)
+  lines.push(`| EO 시작/완료 (발사 후) | T+${e.terminal_eo.processing_start_after_launch_s.toFixed(1)} s / T+${e.terminal_eo.recognition_after_launch_s.toFixed(1)} s |`)
+  lines.push(`| 완료 시 자산 기준 위치 | 표적 ${e.terminal_eo.target_range_at_recognition_m.toFixed(0)} m · U10 ${e.terminal_eo.interceptor_range_at_recognition_m.toFixed(0)} m |`)
+  lines.push(`| EO 완료→요격 여유 | ${e.terminal_eo.time_remaining_to_intercept_s.toFixed(1)} s |`)
   lines.push(`| 표적 픽셀 수 | ${e.optics.pixels_on_target.toFixed(1)} px |`)
-  lines.push(`| 인식 확률 (Johnson) | ${pct(e.optics.recognition_prob)} |`)
+  lines.push(`| ${eoTaskName} 확률 (Johnson) | ${pct(e.optics.recognition_prob)} |`)
   lines.push(`| 획득 확률 P_acq | ${pct(e.optics.acquisition_prob)} |`)
   lines.push(`| 지향 오차 σ (큐⊕지향) | ${e.optics.pointing_sigma_deg.toFixed(2)}° |`)
   lines.push(`| 대기 투과 (시정) | ${pct(e.optics.atmospheric_transmission)} |`)
-  lines.push(`| 50% 인식 거리 | ${e.optics.recognition_range_50_m.toFixed(0)} m |`)
+  lines.push(`| 50% ${eoTaskName} 거리 | ${e.optics.recognition_range_50_m.toFixed(0)} m |`)
   lines.push('')
   lines.push('## 3. 방어 커버리지 (360° 스윕)')
   lines.push('')

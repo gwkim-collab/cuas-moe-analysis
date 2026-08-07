@@ -5,6 +5,7 @@ import {
   johnsonProb,
   recognitionProb,
   recognitionRangeForProb,
+  activeN50,
   acquisitionProb,
   pointingSigmaDeg,
   atmosphericTransmission,
@@ -88,18 +89,35 @@ describe('acquisition (gimbal-less FOV coverage)', () => {
 })
 
 describe('Johnson discrimination levels (per-level N50)', () => {
-  it('identification (higher N50) lowers task probability vs recognition at the same range', () => {
+  it('uses the documented 1.0/4.0/6.4 cycle baselines at two pixels per cycle', () => {
+    expect(O.n50_detection).toBeCloseTo(2, 9)
+    expect(O.n50_recognition).toBeCloseTo(8, 9)
+    expect(O.n50_identification).toBeCloseTo(12.8, 9)
+  })
+
+  it('orders EO task probability detection > recognition > identification at the same range', () => {
     const size = 0.35
     const range = 1500
+    const det = recognitionProb({ ...O, required_discrimination: 'detection' }, size, range)
     const rec = recognitionProb({ ...O, required_discrimination: 'recognition' }, size, range)
     const id = recognitionProb({ ...O, required_discrimination: 'identification' }, size, range)
+    expect(det).toBeGreaterThan(rec)
     expect(rec).toBeGreaterThan(id)
   })
 
-  it('identification requires closer range for 50% than recognition', () => {
+  it('orders 50% range detection > recognition > identification', () => {
+    const rDet = recognitionRangeForProb({ ...O, required_discrimination: 'detection' }, 0.35, 0.5)
     const rRec = recognitionRangeForProb({ ...O, required_discrimination: 'recognition' }, 0.35, 0.5)
     const rId = recognitionRangeForProb({ ...O, required_discrimination: 'identification' }, 0.35, 0.5)
+    expect(rDet).toBeGreaterThan(rRec)
     expect(rId).toBeLessThan(rRec)
+  })
+
+  it('has no active Johnson threshold in radar-only mode', () => {
+    const radarOnly = { ...O, required_discrimination: 'radar_only' as const }
+    expect(activeN50(radarOnly)).toBeNull()
+    expect(recognitionProb(radarOnly, 0.35, 1500)).toBe(1)
+    expect(recognitionRangeForProb(radarOnly, 0.35, 0.5)).toBe(Infinity)
   })
 })
 

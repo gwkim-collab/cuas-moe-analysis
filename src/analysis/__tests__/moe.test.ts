@@ -61,23 +61,43 @@ describe('detection model', () => {
     expect(pdClose).toBeGreaterThan(pdAtEdge)
   })
 
-  it('higher altitude (longer slant range) lowers recognition and P_negate', () => {
+  it('asset-relative target altitude does not leak into the camera↔target EO range', () => {
     const low = scn(); low.threat.altitude_m_agl = 85
     const high = scn(); high.threat.altitude_m_agl = 3000
     const rLow = computeMoe(low)
     const rHigh = computeMoe(high)
-    expect(rHigh.optics.classify_range_m).toBeGreaterThan(rLow.optics.classify_range_m)
-    expect(rHigh.optics.recognition_prob).toBeLessThan(rLow.optics.recognition_prob)
-    expect(rHigh.p_negate).toBeLessThan(rLow.p_negate)
+    expect(rHigh.optics.classify_range_m).toBeCloseTo(rLow.optics.classify_range_m, 9)
+    expect(rHigh.optics.recognition_prob).toBeCloseTo(rLow.optics.recognition_prob, 9)
   })
 
-  it('smaller RCS lowers cumulative detection probability', () => {
+  it('smaller RCS lowers timely cumulative detection probability', () => {
     const big = scn()
     const small = scn()
     small.threat.rcs_m2 = big.threat.rcs_m2 / 100
-    const pBig = computeDetection(big.sensor, big.threat, big.site.keep_out_radius_m).cumulative_pd
-    const pSmall = computeDetection(small.sensor, small.threat, small.site.keep_out_radius_m).cumulative_pd
+    const pBig = computeMoe(big).breakdown.p_detect
+    const pSmall = computeMoe(small).breakdown.p_detect
     expect(pSmall).toBeLessThan(pBig)
+  })
+
+  it('uses detection accumulated only until the doctrinal launch deadline', () => {
+    const s = scn()
+    const r = computeMoe(s)
+    expect(r.detection.timely_cutoff_range_m).toBeCloseTo(r.reach.required_detection_range_m, 6)
+    expect(r.breakdown.p_detect).toBeCloseTo(r.detection.cumulative_pd_in_time, 12)
+    expect(r.detection.cumulative_pd_in_time).toBeLessThan(1)
+    expect(r.detection.cumulative_pd_before_keep_out).toBeGreaterThanOrEqual(
+      r.detection.cumulative_pd_in_time,
+    )
+    expect(r.detection.looks_in_time).toBeLessThan(r.detection.looks_before_keep_out)
+  })
+
+  it('does not credit a radar that only becomes reliable after the launch deadline', () => {
+    const s = scn()
+    s.sensor.ref_detection_range_m = 1000
+    const r = computeMoe(s)
+    expect(r.detection.cumulative_pd_before_keep_out).toBeCloseTo(1, 12)
+    expect(r.breakdown.p_detect).toBeCloseTo(0.02737, 4)
+    expect(r.breakdown.p_detect).toBeLessThan(0.05)
   })
 })
 
@@ -104,7 +124,7 @@ describe('doctrine-driven engagement (commit range)', () => {
   it('required detection range = commit + v_t · t_react', () => {
     const s = scn()
     const r = solve(s)
-    const tReact = s.sensor.classify_time_s + s.c2.decision_latency_s + s.effector.launch_delay_s
+    const tReact = s.c2.decision_latency_s + s.effector.launch_delay_s
     expect(r.required_detection_range_m).toBeCloseTo(
       s.effector.commit_range_m + s.threat.speed_m_s * tReact,
       6,
@@ -134,20 +154,23 @@ describe('doctrine-driven engagement (commit range)', () => {
     expect(rFar.reach.detection_margin_m).toBeGreaterThan(rNear.reach.detection_margin_m)
   })
 
-  it('REGRESSION: raising pd_max no longer degrades P_negate', () => {
-    // Before the commit range existed, launch (and therefore classification) was
-    // pinned to detection, so a better radar classified FARTHER out and P_negate
-    // fell — 40.3% → 33.6% across this same sweep. It must now be flat.
-    const base = computeMoe(scn()).p_negate
+  it('changing the Pd curve ceiling only changes the timely-detection gate', () => {
+    const base = computeMoe(scn())
     for (const pd_max of [0.92, 0.95, 0.98, 0.99]) {
       const s = scn(); s.sensor.pd_max = pd_max
-      expect(computeMoe(s).p_negate).toBeCloseTo(base, 9)
+      const r = computeMoe(s)
+      expect(r.reach.threat_range_at_launch_m).toBeCloseTo(base.reach.threat_range_at_launch_m, 9)
+      expect(r.optics.classify_range_m).toBeCloseTo(base.optics.classify_range_m, 9)
+      expect(r.p_negate / r.breakdown.p_detect).toBeCloseTo(
+        base.p_negate / base.breakdown.p_detect,
+        9,
+      )
     }
   })
 
   it('falls back to "launch as soon as possible" when detection is too late', () => {
     const s = scn()
-    s.sensor.ref_detection_range_m = 1500 // well inside the required 3.66 km
+    s.sensor.ref_detection_range_m = 1500 // well inside the required ~3.46 km
     const r = solve(s)
     const tReact = r.budget.react_total_s
     expect(r.detection_limited).toBe(true)
@@ -156,40 +179,36 @@ describe('doctrine-driven engagement (commit range)', () => {
     expect(r.threat_range_at_launch_m).toBeLessThan(s.effector.commit_range_m)
   })
 
-  it('classification is back-solved from launch, and reduces to detect − v·t_classify when detection-limited', () => {
+  it('solves EO processing only after launch in camera↔target relative range', () => {
     const s = scn()
-    const doctrine = solve(s)
-    expect(doctrine.classify_at_range_m).toBeCloseTo(
-      doctrine.threat_range_at_launch_m +
-        s.threat.speed_m_s * (s.c2.decision_latency_s + s.effector.launch_delay_s),
+    const r = computeMoe(s)
+    const closing = s.effector.cruise_speed_m_s + s.threat.speed_m_s
+    expect(r.terminal_eo.processing_start_separation_m).toBeCloseTo(
+      s.optics.terminal_recognition_range_m + closing * s.sensor.classify_time_s,
       6,
     )
-
-    const late = scn()
-    late.sensor.ref_detection_range_m = 1500
-    const rLate = solve(late)
-    expect(rLate.detection_limited).toBe(true)
-    expect(rLate.classify_at_range_m).toBeCloseTo(
-      rLate.detect_at_range_m - late.threat.speed_m_s * late.sensor.classify_time_s,
+    expect(r.terminal_eo.processing_start_after_launch_s).toBeGreaterThanOrEqual(0)
+    expect(r.terminal_eo.recognition_after_launch_s).toBeCloseTo(
+      r.terminal_eo.processing_start_after_launch_s + s.sensor.classify_time_s,
       6,
     )
   })
 
-  it('bottleneck flags the detection shortfall even when detect is not the lowest gate', () => {
+  it('bottleneck flags a late radar as an explicit timely-detection shortfall', () => {
     const s = scn()
     s.sensor.ref_detection_range_m = 1500
     const r = computeMoe(s)
     expect(r.reach.detection_limited).toBe(true)
-    expect(r.breakdown.p_detect).toBeGreaterThan(r.breakdown.p_classify) // detect is NOT the min gate
+    expect(r.breakdown.p_detect).toBeLessThan(r.breakdown.p_classify)
     expect(diagnoseBottleneck(r).recommendation).toContain('탐지 제약')
   })
 
-  it('a longer commit range pushes the EO recognition requirement outward', () => {
+  it('a longer commit range buys standoff without changing the EO completion separation', () => {
     const near = scn(); near.effector.commit_range_m = 1500
     const far = scn(); far.effector.commit_range_m = 3000
     const rNear = computeMoe(near), rFar = computeMoe(far)
-    expect(rFar.optics.classify_range_m).toBeGreaterThan(rNear.optics.classify_range_m)
-    expect(rFar.optics.recognition_prob).toBeLessThan(rNear.optics.recognition_prob)
+    expect(rFar.optics.classify_range_m).toBeCloseTo(rNear.optics.classify_range_m, 9)
+    expect(rFar.optics.recognition_prob).toBeCloseTo(rNear.optics.recognition_prob, 9)
     expect(rFar.reach.required_detection_range_m).toBeGreaterThan(rNear.reach.required_detection_range_m)
     // ...and buys standoff: the intercept happens farther from the asset.
     expect(rFar.reach.intercept_range_m).toBeGreaterThan(rNear.reach.intercept_range_m)
@@ -246,8 +265,8 @@ describe('computeMoe composition', () => {
   })
 
   it('default scenario is feasible and negates the threat with meaningful probability', () => {
-    // ≈23% at defaults. The 3 km commit doctrine forces the EO to recognise at
-    // ~3.46 km, which is what holds this down — see the commit-range trade.
+    // Launch occurs at 3 km; onboard EO then completes at its own 500 m
+    // camera↔target separation before intercept.
     const r = computeMoe(scn())
     expect(r.feasible).toBe(true)
     expect(r.p_negate).toBeGreaterThan(0.2)
@@ -278,40 +297,50 @@ describe('computeMoe composition', () => {
     expect(d.subFactor?.label).toContain('대기 투과')
   })
 
-  it('decision-recognition coupling: 0 = independent, >0 lowers P_decision when recognition is poor', () => {
-    const indep = scn(); indep.c2.decision_recognition_coupling = 0
-    expect(computeMoe(indep).breakdown.p_decision).toBeCloseTo(indep.c2.decision_reliability, 9)
-
-    // full coupling + poor recognition (tiny target) → P_decision drops below reliability
-    const coupled = scn()
-    coupled.c2.decision_recognition_coupling = 1
-    coupled.threat.characteristic_size_m = 0.15
-    const r = computeMoe(coupled)
-    expect(r.breakdown.p_decision).toBeLessThan(coupled.c2.decision_reliability)
-    expect(r.breakdown.p_decision).toBeCloseTo(coupled.c2.decision_reliability * r.optics.recognition_prob, 6)
+  it('pre-launch P_decision is independent of the EO image produced after launch', () => {
+    const s = scn()
+    s.c2.decision_recognition_coupling = 1 // legacy saved-scenario field
+    s.threat.characteristic_size_m = 0.15
+    expect(computeMoe(s).breakdown.p_decision).toBeCloseTo(s.c2.decision_reliability, 9)
   })
 
   it('engagement ROE (required_discrimination) restructures the kill chain', () => {
+    const radar = scn(); radar.optics.required_discrimination = 'radar_only'
     const det = scn(); det.optics.required_discrimination = 'detection'
     const rec = scn(); rec.optics.required_discrimination = 'recognition'
     const id = scn(); id.optics.required_discrimination = 'identification'
-    const rDet = computeMoe(det), rRec = computeMoe(rec), rId = computeMoe(id)
-    expect(rDet.optics.eo_gate_applied).toBe(false)
+    const rRadar = computeMoe(radar), rDet = computeMoe(det), rRec = computeMoe(rec), rId = computeMoe(id)
+    expect(rRadar.optics.eo_gate_applied).toBe(false)
+    expect(rDet.optics.eo_gate_applied).toBe(true)
     expect(rRec.optics.eo_gate_applied).toBe(true)
-    expect(rDet.p_negate).toBeGreaterThan(rRec.p_negate) // radar-only is easier
+    expect(rRadar.p_negate).toBeGreaterThan(rDet.p_negate) // no EO gate is easiest
+    expect(rDet.p_negate).toBeGreaterThan(rRec.p_negate) // EO detection is easier than recognition
     expect(rRec.p_negate).toBeGreaterThan(rId.p_negate) // identification is stricter
   })
 
-  it('radar-only (detection ROE) P_negate is independent of EO pointing error', () => {
-    const a = scn(); a.optics.required_discrimination = 'detection'; a.optics.pointing_error_deg = 0.4
-    const b = scn(); b.optics.required_discrimination = 'detection'; b.optics.pointing_error_deg = 3.0
+  it('radar-only P_negate is independent of EO pointing error', () => {
+    const a = scn(); a.optics.required_discrimination = 'radar_only'; a.optics.pointing_error_deg = 0.4
+    const b = scn(); b.optics.required_discrimination = 'radar_only'; b.optics.pointing_error_deg = 3.0
     expect(computeMoe(a).p_negate).toBeCloseTo(computeMoe(b).p_negate, 9)
+  })
+
+  it('separates radar-track confidence from the EO task ceiling', () => {
+    const radarA = scn(); radarA.optics.required_discrimination = 'radar_only'; radarA.sensor.classify_prob = 0.2
+    const radarB = scn(); radarB.optics.required_discrimination = 'radar_only'; radarB.sensor.classify_prob = 0.9
+    expect(computeMoe(radarA).p_negate).toBeCloseTo(computeMoe(radarB).p_negate, 9)
+
+    const radarWeak = scn(); radarWeak.optics.required_discrimination = 'radar_only'; radarWeak.sensor.radar_track_confidence = 0.5
+    expect(computeMoe(radarWeak).p_negate).toBeLessThan(computeMoe(radarA).p_negate)
+
+    const eoA = scn(); eoA.optics.required_discrimination = 'recognition'; eoA.sensor.radar_track_confidence = 0.2
+    const eoB = scn(); eoB.optics.required_discrimination = 'recognition'; eoB.sensor.radar_track_confidence = 0.9
+    expect(computeMoe(eoA).p_negate).toBeCloseTo(computeMoe(eoB).p_negate, 9)
   })
 
   it('false-engagement option: null when off; computed & looser-ROE-worse when on', () => {
     expect(computeMoe(scn()).false_engagement).toBeNull() // off by default
 
-    const det = scn(); det.c2.false_engagement_enabled = true; det.optics.required_discrimination = 'detection'
+    const det = scn(); det.c2.false_engagement_enabled = true; det.optics.required_discrimination = 'radar_only'
     const id = scn(); id.c2.false_engagement_enabled = true; id.optics.required_discrimination = 'identification'
     const fDet = computeMoe(det).false_engagement!
     const fId = computeMoe(id).false_engagement!
@@ -319,7 +348,7 @@ describe('computeMoe composition', () => {
     expect(fDet).toBeGreaterThan(fId) // radar-only ROE → more wrong engagements
 
     // enabling the option does not change p_negate (it is a separate metric)
-    const detOff = scn(); detOff.optics.required_discrimination = 'detection'
+    const detOff = scn(); detOff.optics.required_discrimination = 'radar_only'
     expect(computeMoe(det).p_negate).toBeCloseTo(computeMoe(detOff).p_negate, 9)
   })
 

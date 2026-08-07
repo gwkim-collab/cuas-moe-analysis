@@ -72,7 +72,7 @@ export default function McResults({ result }: Props) {
           킬체인 순서(탐지→분류→결심→도달→살상)대로 판정해, <b>처음 실패한 단계</b>만 1회 집계합니다.
           막대·백분율의 분모는 <b>누수 시행 {failureTotal.toLocaleString()}회</b>(전체 {trials.toLocaleString()}회 중)입니다.
           앞 단계에서 이미 걸러진 시행은 뒤 단계에 도달하지 못하므로, <b>0은 "그 단계가 첫 실패인 적이 없다"</b>는 뜻이지
-          그 단계의 확률이 0이라는 뜻이 아닙니다 — 예: P_detect가 100%면 탐지는 항상 0입니다.
+          그 단계의 확률이 0이라는 뜻이 아닙니다 — 예: P_detect가 거의 100%면 유한 시행에서 탐지 실패가 0회일 수 있습니다.
         </div>
         {(Object.keys(GATE_LABELS) as GateName[]).map((g) => {
           const c = gate_failure_counts[g]

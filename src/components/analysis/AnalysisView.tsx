@@ -17,6 +17,7 @@ import McResults from './McResults'
 import CoverageView from './CoverageView'
 import TradeView from './TradeView'
 import SpecView from './SpecView'
+import EoDesignView from './EoDesignView'
 import ReferenceView from './ReferenceView'
 import CompareView from './CompareView'
 import ParamExplainModal from './ParamExplainModal'
@@ -36,21 +37,23 @@ interface Props {
   onExit: () => void
 }
 
-type AnalysisType = 'engagement' | 'coverage' | 'trade' | 'spec' | 'compare' | 'reference'
+type AnalysisType = 'engagement' | 'eoDesign' | 'coverage' | 'trade' | 'spec' | 'compare' | 'reference'
 type Fidelity = 'analytical' | 'montecarlo'
 
 const TYPE_LABELS: Record<AnalysisType, string> = {
   engagement: '교전 효과도',
+  eoDesign: 'EO/IR 설계',
   coverage: '방어 커버리지',
   trade: '트레이드 스터디',
   spec: '스펙 역산',
   compare: '시나리오 비교',
-  reference: '파라미터 설명',
+  reference: '도움말',
 }
 
 /**
  * Analysis mode.
  *  · engagement (Phase 1) — single-scenario Pk-chain MOE (analytical or MC).
+ *  · eoDesign   — reverse-size optics and validate the radar→EO→launch timeline.
  *  · coverage   (Phase 2) — 360° defended-footprint sweep on a 3D map.
  *  · trade      (Phase 4) — 1D/2D parameter sweep + tornado sensitivity.
  *  · spec       (Phase 4) — inverse solve: parameter needed for a target MOE.
@@ -292,6 +295,7 @@ export default function AnalysisView({ onExit }: Props) {
                 ))}
 
               {type === 'coverage' && <CoverageView scenario={scenario} />}
+              {type === 'eoDesign' && <EoDesignView scenario={scenario} onChange={setScenario} />}
               {type === 'trade' && <TradeView scenario={scenario} />}
               {type === 'spec' && <SpecView scenario={scenario} />}
               {type === 'compare' && <CompareView scenario={scenario} />}

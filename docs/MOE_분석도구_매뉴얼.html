@@ -38,978 +38,286 @@ hr { border: none; border-top: 1px solid #d5e5e0; margin: 2.4em 0; }
 <div class="doc-meta">AIRLOCK MOE 문서 · MD에서 자동 생성(pnpm gen:docs) · 원본은 MOE_분석도구_매뉴얼.md</div>
 <h1>AIRLOCK 효과도(MOE) · 시스템 분석 도구 — 사용 매뉴얼</h1>
 <blockquote>
-<p>대상: C-UAS 요격 체계(AB-U10)의 효과도(Measure of Effectiveness)와 시스템 트레이드오프를
-분석하는 도구. 이 문서는 현재 구현 상태 기준의 사용·모델 설명서입니다.</p>
-<p>⚠ **모든 기본 수치는 가정·입력값(미확정, 편집 가능)**입니다(공개 문헌·목업 근사). 확정 성능치가
-아니며, 가상(미존재) 체계는 실측 대신 <strong>가정/요구사항</strong>으로 다룹니다. 이 도구의 전제는 &quot;모든 값은 편집 가능한 입력&quot;입니다.</p>
-<p><strong>확정 설계 결정</strong>: 🔒 <strong>짐벌 미도입</strong>(EO는 기체 고정 · 획득 P_acq가 상시 적용). &nbsp; <strong>미정(향후)</strong>: 표적 크기(임계 치수).</p>
+<p>대상: C-UAS 요격 체계(AB-U10)의 효과도와 시스템 트레이드오프 분석.
+모든 기본값은 편집 가능한 가정·요구값이며 확정 성능치가 아닙니다. 도메인 전문가(SME) 검증이 필요합니다.</p>
 </blockquote>
-<hr>
 <h2>1. 실행</h2>
-<blockquote>
-<p>경로는 모두 <strong>저장소 루트</strong> 기준(AIRLOCK 워크스페이스에서는 이 저장소가 <code>components/c2/</code>에 위치).</p>
-</blockquote>
 <ul>
-<li><strong>원클릭</strong>: 루트의 <code>run.cmd</code> 더블클릭 → (필요 시 의존성 자동 설치) → dev 서버 + 브라우저 자동</li>
-<li><strong>터미널</strong>: (최초 1회 <code>pnpm install</code> 후) <code>pnpm start</code> (= <code>vite --open</code>). 개발 포트 <code>5174</code> → <a href="http://localhost:5174/">http://localhost:5174/</a></li>
-<li>운용 화면에서 우상단 <strong>&quot;효과도 분석 ▸&quot;</strong> 버튼 또는 키보드 <strong><code>A</code></strong> 로 진입, <strong><code>O</code></strong> 로 운용 화면 복귀</li>
-<li>검증: <code>pnpm gen:sample</code>(샘플 CSV 재생성) · <code>pnpm exec tsc -b</code>(타입체크) · <code>pnpm test</code>(= vitest)</li>
+<li>원클릭: 저장소 루트의 <code>run.cmd</code></li>
+<li>터미널: <code>pnpm install</code> 후 <code>pnpm start</code></li>
+<li>기본 개발 주소: <a href="http://localhost:5174/">http://localhost:5174/</a></li>
+<li>운용 화면에서 <code>효과도 분석 ▸</code> 또는 <code>A</code>, 복귀는 <code>O</code></li>
+<li>검증: <code>pnpm test</code> · <code>pnpm exec tsc -b</code> · <code>pnpm build</code></li>
 </ul>
 <h2>2. 화면 구성</h2>
 <ul>
-<li><strong>좌측 패널</strong>: 시나리오 파라미터(위협·레이더·EO/IR·이팩터·C2·사이트). 상단에 프리셋/저장 바, &quot;↺ 기본값&quot;.
-각 파라미터 옆 <strong>ⓘ</strong> 클릭 → 수식·그림·근거 팝업.</li>
-<li><strong>상단 탭(6)</strong>: 교전 효과도 · 방어 커버리지 · 트레이드 스터디 · 스펙 역산 · 시나리오 비교 · 파라미터 설명
-(교전 효과도 내에서 해석식 ↔ 몬테카를로 전환)</li>
-<li><strong>우상단</strong>: CSV 불러오기/저장 · ⤓샘플 · JSON · 리포트(MD) · 운용 화면</li>
+<li>좌측 패널: 위협·레이더·EO/IR·이팩터·C2·사이트 입력. 항목에 마우스를 올리면 의미·이론 근거·모델 가정·값 출처가 나오고, <code>ⓘ</code>에서 수식과 현재 곡선을 확인합니다.</li>
+<li>상단 탭: 교전 효과도 · EO/IR 설계 · 방어 커버리지 · 트레이드 스터디 · 스펙 역산 · 시나리오 비교 · 도움말.</li>
+<li>우상단: CSV 불러오기/저장 · 샘플 · JSON · 리포트(MD) · 운용 화면.</li>
 </ul>
-<h2>3. 핵심 모델 — 킬체인 곱</h2>
-<p>무력화 확률은 5개 독립 게이트의 곱입니다:</p>
-<pre><code>P_negate = P_detect × P_classify × P_decision × P_reach × P_kill
-누수(leakage) = 1 − P_negate
-</code></pre>
-<p>가장 낮은 게이트가 <strong>제약 단계(병목)</strong> — 교전 효과도 상단 카드가 이를 자동 진단하고 개선 권고를 제시합니다.</p>
-<h3>3.0 교전은 교리로 개시된다 — 발사 개시 거리</h3>
-<p><strong>핵심 전제:</strong> 이 체계는 <strong>대응 거리가 정해져 있습니다.</strong> 위협이 <strong>발사 개시 거리</strong>(기본 3 km)에 도달하면 발사합니다.
-<strong>일찍 탐지했다고 일찍 쏘지 않습니다</strong> — 일찍 탐지하면 <em>여유</em>만 늘어납니다.</p>
-<pre><code>발사 시 위협 거리  R_launch = min( R_commit , R_detect − v_t · t_react )
-필요 탐지거리      R_required = R_commit + v_t · t_react
-반응 예산          t_react = 분류시간 + 결심지연 + 발사지연
-분류 완료 거리     R_classify = R_launch + v_t · (결심지연 + 발사지연)
-</code></pre>
+<h3>2.1 도움말 · 파라미터 매뉴얼</h3>
+<p><code>도움말</code>은 좌측 툴팁과 같은 설명 원본을 사용합니다. 44개 수치 입력과 선택형 설정을 분야별로 확인하거나
+이름·key·수식·근거·출처로 검색할 수 있습니다. 각 항목에는 다음이 구분되어 표시됩니다.</p>
 <ul>
-<li><strong>교리 지배</strong>(탐지 충분): <code>R_launch = R_commit</code>. 탐지 성능을 더 올려도 <strong>P_negate는 평평</strong>하고 탐지 여유만 커집니다.</li>
-<li><strong>탐지 제약</strong>(탐지 부족): 반응 예산이 발사 개시 거리 앞에 안 들어감 → &quot;가능한 즉시&quot; 발사로 후퇴.
-결과 카드·타임라인에 ⚠ 표시되고, 병목 진단이 부족분(m)을 짚습니다.</li>
+<li><strong>의미·실제 동작</strong>: 현재 코드에서 결과에 어떻게 반영되는지</li>
+<li><strong>계산식·해설</strong>: 방향성, 비단조 관계, 활성 조건</li>
+<li><strong>이론 근거</strong>: 레이더 방정식, Johnson/NVESD, Koschmieder, 확률 결합, 1차 운동학 등</li>
+<li><strong>모델 가정·한계</strong>: 축대칭, 독립 시행, 고정 FOV, 기준 좌표계 등</li>
+<li><strong>값 출처</strong>: 실측/스펙/운용 입력인지, 편집 가능한 미확정 가정값인지</li>
 </ul>
-<p><strong>분류 시점도 발사에서 역산</strong>합니다 — 결심·발사 지연을 확보할 수 있는 한 <strong>가장 늦게(=가장 가깝게, 가장 선명하게)</strong>
-분류합니다. 탐지 제약 상태에서만 <code>R_classify = R_detect − v_t·분류시간</code>으로 되돌아갑니다.</p>
-<blockquote>
-<p>⚠ <strong>모델 이력</strong>: 이 교리 층이 생기기 전에는 발사 시점이 탐지 시점에서 파생돼(<code>R_launch = R_detect − v_t·t_react</code>),
-<strong>레이더 성능을 올리면 분류가 더 먼 거리에서 일어나 P_negate가 오히려 떨어지는</strong> 비직관적 거동이 있었습니다
-(최대 Pd 0.6→0.98 스윕에서 40.3%→33.6%). 지금은 그 스윕이 완전히 평평합니다.</p>
-</blockquote>
-<h3>3.1 물리 5층과 근거</h3>
+<p><code>레이더(고급)</code>의 최대 Pd와 전이 폭은 단독 성능 지표가 아니라 곡선 형태 파라미터입니다. 실제 ROC 보정값이 없으면 기본적으로 변경하지 않습니다.</p>
+<h2>3. 현재 킬체인</h2>
+<pre><code class="language-text">레이더 탐지 → C2 발사 결심 → AB-U10 발사 → [선택 시 탑재 EO 처리] → 요격/살상
+</code></pre>
+<pre><code class="language-text">P_negate = P_detect × P_terminal × P_decision × P_reach × P_kill
+leakage = 1 − P_negate
+</code></pre>
+<p><code>P_terminal</code>은 정책에 따라 달라집니다. EO 미적용은 <code>P(교전 유효 레이더 트랙 | 적시 탐지)</code>, EO D/R/I는 발사 후 <code>P_terminal EO</code>입니다. 내부 호환 필드명은 <code>P_classify</code>입니다.</p>
 <table>
 <thead>
 <tr>
 <th>단계</th>
-<th>무엇</th>
-<th>이론 근거</th>
-<th>핵심 파라미터</th>
+<th>의미</th>
+<th>핵심 입력</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>P_detect</strong></td>
-<td>레이더 누적 탐지</td>
-<td>레이더 방정식 R∝RCS^¼ · 로지스틱 Pd · 독립 스캔 누적 1−Π(1−pd)</td>
-<td>기준 탐지거리, <strong>탐지거리 Pd</strong>, 재방문 주기, RCS (최대 Pd·전이 폭은 고급)</td>
+<td>P_detect</td>
+<td>발사 교리를 지킬 수 있는 마감선까지의 적시 누적 탐지</td>
+<td>기준 RCS·탐지거리·Pd·재방문</td>
 </tr>
 <tr>
-<td><strong>P_classify</strong></td>
-<td>EO/IR 식별</td>
-<td>획득 P_acq × 인식(Johnson) × 대기투과 × 분류기 상한</td>
-<td>아래 참조</td>
+<td>P_terminal</td>
+<td>EO 미적용: 적시 탐지 후 교전 유효 트랙 / EO D/R/I: 발사 후 획득·선택 과업</td>
+<td>트랙 유효 신뢰도 또는 해상도·화각·N50·지향 오차·시정</td>
 </tr>
 <tr>
-<td><strong>P_decision</strong></td>
-<td>운용자 결심</td>
-<td>직렬 게이트. 선택적 인식 커플링 P_decision=신뢰도×(1−커플링·(1−인식))</td>
-<td>결심 신뢰도, 결심-인식 커플링</td>
+<td>P_decision</td>
+<td>레이더 트랙에 근거한 발사 승인 신뢰도</td>
+<td>결심 지연·신뢰도</td>
 </tr>
 <tr>
-<td><strong>P_reach</strong></td>
-<td>요격 도달 기하</td>
-<td>등속 반경 운동학 · 여유 불확실성 정규화 Φ(여유/σ)</td>
-<td>순항속도, 반응예산, 요격기 도달 반경, keep-out, 체공, 여유 σ</td>
+<td>P_reach</td>
+<td>keep-out 밖에서 표적까지 도달</td>
+<td>발사거리·속도·도달반경·체공</td>
 </tr>
 <tr>
-<td><strong>P_kill</strong></td>
-<td>이펙터 살상</td>
-<td>독립 시행 이항 1−(1−p)ⁿ</td>
-<td>단발 Pk(net/shotgun), 사격 기회</td>
+<td>P_kill</td>
+<td>종말 페이로드 무력화</td>
+<td>단발 Pk·사격 기회 수</td>
 </tr>
 </tbody></table>
-<h3>3.2 P_classify 상세 (짐벌 없는 EO 전제)</h3>
-<p><strong>EO/IR 처리 단계</strong> — 레이더가 탐지(&quot;뭔가 있다&quot;)해 준 표적을 받아 EO는 두 단계로 처리합니다:</p>
-<table>
-<thead>
-<tr>
-<th>단계</th>
-<th>질문</th>
-<th>무엇을 보나</th>
-<th>파라미터</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>① 획득 (Acquisition)</strong></td>
-<td>&quot;화면에 들어왔나?&quot;</td>
-<td>짐벌 없는 고정 FOV 안에 표적이 드는지 (지향 정밀도)</td>
-<td>P_acq — 화각, 레이더 큐·요격기 지향 오차 σ</td>
-</tr>
-<tr>
-<td><strong>② 분류 (Classification)</strong></td>
-<td>&quot;이게 뭔지?&quot;</td>
-<td>들어온 표적을 Johnson 기준으로 판별</td>
-<td>인식·식별 N50</td>
-</tr>
-<tr>
-<td>&nbsp;&nbsp;· 인식 (Recognition)</td>
-<td>&quot;위협이냐 아니냐?&quot;</td>
-<td>부류 판단(드론 vs 새)</td>
-<td>인식 N50 (≈4.0cyc)</td>
-</tr>
-<tr>
-<td>&nbsp;&nbsp;· 식별 (Identification)</td>
-<td>&quot;어떤 기종이냐?&quot;</td>
-<td>형식 판단</td>
-<td>식별 N50 (≈6.4cyc)</td>
-</tr>
-</tbody></table>
-<p>여기에 <strong>대기투과</strong>(대비 손실)와 <strong>분류기 상한</strong>이 곱해집니다. 순서: <strong>획득(들어왔나) → 분류(뭔지)</strong>.
-탐지(&quot;뭔가 있다&quot;)는 이 앞의 **레이더 단계(P_detect)**이며 EO엔 탐지 단계가 없습니다.</p>
-<pre><code>P_classify = P_acq(획득) × 인식/식별(Johnson 분류) × 대기투과 × 분류기 상한
-</code></pre>
-<p><strong>교전 기준(ROE)이 킬체인 구조를 바꿉니다</strong> — &quot;요구 판별 수준&quot;에 따라 EO 게이트 적용 여부가 달라짐:</p>
-<table>
-<thead>
-<tr>
-<th>교전 기준</th>
-<th>EO 게이트</th>
-<th>기본 P_negate</th>
-<th>오교전 위험(옵션)</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>탐지</strong>(레이더 단독)</td>
-<td>✗ 미적용</td>
-<td><strong>84.7%</strong></td>
-<td><strong>16%</strong></td>
-</tr>
-<tr>
-<td><strong>인식</strong>(EO 인식)</td>
-<td>✓ 적용 (인식 N50)</td>
-<td>23.3%</td>
-<td>4%</td>
-</tr>
-<tr>
-<td><strong>식별</strong>(EO 식별)</td>
-<td>✓ 적용 (식별 N50)</td>
-<td>7.2%</td>
-<td>1%</td>
-</tr>
-</tbody></table>
-<p><strong>트레이드오프가 정량화됩니다</strong>: 느슨한 ROE(탐지)는 위협 무력화율↑(85%)이지만 <strong>오교전(비위협 격추) 위험↑</strong>(16%).
-엄격한 ROE(식별)는 무력화율↓(14%)이나 오교전 최소(1%). 무엇을 우선할지가 ROE 선택입니다.
-(오교전 위험 = 비위협 유입률 × 교전기준별 오통과율. <strong>C2 그룹의 &quot;오교전 위험 모델&quot; 옵션</strong>을 켜야 계산·표시됨. 기본 OFF.)
-아래 P_classify 식은 <strong>인식·식별</strong> 기준일 때 적용:</p>
-<pre><code>P_classify = P_acq × 인식(Johnson) × 대기투과 T × 분류기 상한     (인식·식별 기준)
-P_classify = 분류기(선언) 상한                                    (탐지 기준 — 레이더 단독)
+<h2>4. 발사 전 시간선</h2>
+<p>발사는 좌측의 <code>발사 개시 거리 (교리)</code>가 결정합니다. EO 완료거리를 입력해 발사거리를 역산하지 않습니다.</p>
+<pre><code class="language-text">t_prelaunch = t_decision + t_launch_delay
+R_required_detection = R_commit + v_target · t_prelaunch
+R_launch = min(R_commit, R_detect − v_target · t_prelaunch)
 </code></pre>
 <ul>
-<li><strong>획득 P_acq</strong> — 짐벌이 없어 표적이 고정 FOV에 들어와야 함. 원형 가우시안 지향오차 → Rayleigh:
-<code>P_acq = 1 − exp(−(HFOV/2)² / (2σ²))</code>, <code>σ = √(레이더 큐 오차² + 요격기 지향 오차²)</code>
-→ 화각을 좁히면 인식은 쉬워지나 획득이 떨어져 <strong>최적 화각</strong>이 존재.</li>
-<li><strong>분류 · 인식/식별(Johnson/NVESD)</strong> — <code>P = nᴱ/(1+nᴱ)</code>, <code>n = 표적픽셀수/N50</code>, <code>E = 2.7+0.7n</code>.
-표적 픽셀 수 <code>N = 크기·H_px/(경사거리·HFOV_rad)</code>.
-EO 분류 N50: <strong>인식(≈4.0cyc) &lt; 식별(≈6.4cyc)</strong> (px≈2×cycle). 탐지(&quot;뭔가 있다&quot;)는 레이더 몫(P_detect)이라
-EO N50이 없음. 교전 기준이 인식/식별이면 해당 N50이 P_classify에 쓰임.</li>
-<li><strong>대기투과 T</strong> — Koschmieder <code>β=3.912/시정(km)</code> + Beer-Lambert <code>T=exp(−β·R)</code>.</li>
-<li><strong>경사거리(3D)</strong> — 지상 센서 LOS = √(수평²+고도²). 탐지·인식·대기투과는 경사거리로 평가
-(고고도 표적 불리). 교전 closing 기하는 수평 반경(현재 가정).</li>
+<li>탐지가 충분하면 위협이 <code>R_commit</code>에 도달할 때 발사합니다. 더 먼 탐지가 결정론적 발사 시점을 앞당기지는 않지만, 적시 누적 <code>P_detect</code>는 포화 전까지 높아질 수 있습니다.</li>
+<li>탐지가 늦으면 <code>가능한 즉시</code> 발사로 후퇴하고 발사 위치가 자산 쪽으로 밀립니다.</li>
+<li><code>EO 처리 시간</code>은 발사 후 값이므로 필요 탐지거리 계산에 포함하지 않습니다.</li>
 </ul>
-<h2>★ 없는(가상) 시스템 다루기 — 실측 대신 &quot;요구사항 도출&quot;</h2>
-<p>레이더처럼 <strong>아직 존재하지 않는 체계</strong>는 값을 실측할 수 없습니다. 그래도 이 도구는 완전히 유효합니다 —
-값을 <strong>가정/요구사항</strong>으로 두고, 오히려 <strong>&quot;필요 성능&quot;을 거꾸로 도출</strong>하는 데 씁니다.</p>
-<ul>
-<li><p><strong>레이더는 세 값이면 정의</strong>됩니다: <strong>기준 RCS · 기준 탐지거리 · 탐지거리 Pd</strong>
-= <em>&quot;RCS X㎡를 Y km에서 <strong>Pd Z로</strong> 탐지&quot;</em>. 데이터시트가 실제로 주는 형태 그대로입니다.
-임의 RCS의 탐지거리는 R∝RCS^¼로 자동 환산. 나머지(최대 Pd·전이 폭)는 <strong>고급·곡선 형태 가정값</strong>이라
-접이식으로 숨겨져 있고 보통 손대지 않습니다.</p>
-<blockquote>
-<p>⚠ <strong>&quot;탐지거리&quot;는 확률과 짝이어야 의미가 생깁니다.</strong> 내부 로지스틱 중심(Pd 50% 지점)은 입력한 거리가
-<strong>아니라</strong> 두 값에서 역산됩니다: <code>R_half = R_q − w·ln(P_max/p_q − 1)</code>.
-기본값 &quot;0.01㎡ @ 3 km, Pd 0.9&quot;는 중심 <strong>3726 m</strong>로 환산됩니다. 인용 거리를 그대로 곡선 중심으로 쓰면
-3 km에서 Pd 0.49인 <strong>훨씬 나쁜 레이더</strong>를 모델링하게 됩니다.</p>
-</blockquote>
-</li>
-<li><p>값의 성격은 라벨로 정직하게: <strong>가정·입력값(미확정)</strong> / <strong>참고 대표값</strong> / (있으면) 측정값.
-&quot;실측 필요&quot;가 아니라 &quot;가정해서 넣는 값&quot;입니다.</p>
-</li>
-</ul>
-<p><strong>거꾸로 쓰는 3가지:</strong></p>
-<ol>
-<li><strong>스펙 역산</strong> — 목표 P_negate(예 70%)를 만족하려면 특정 파라미터가 얼마여야 하는지 임계값 도출.
-예: &quot;탐지 70% 목표 → 기준 탐지거리 최소 몇 km?&quot; / &quot;지향 오차는 몇 ° 이하?&quot;</li>
-<li><strong>트레이드 스터디</strong> — 파라미터를 쓸며 P_negate 곡선·민감도(토네이도)로 무엇이 지배적인지 파악.</li>
-<li><strong>병목 진단</strong> — 교전 효과도 상단 카드가 현재 제약 단계를 짚음 → 그게 곧 &quot;가장 급한 요구사항&quot;.</li>
-</ol>
-<p>즉 **&quot;측정값 넣는 도구&quot;가 아니라 &quot;요구사항 뽑는 도구&quot;**로 쓰면 데이터가 없어도 됩니다.</p>
-<blockquote>
-<p>📊 실제로 뽑은 스터디 결과(표적크기 민감도·짐벌 없는 대안·위협 케이스별 효과도)는
-<strong><a href="./MOE_%EC%8A%A4%ED%84%B0%EB%94%94_%EA%B2%B0%EA%B3%BC.md"><code>MOE_스터디_결과.md</code></a></strong> 참고.</p>
-</blockquote>
-<blockquote>
-<p>ℹ️ <strong>아래 예시·스터디의 P_negate 수치는 결심-인식 커플링=0(독립) 기준</strong>으로 계산했습니다
-(연구 대상 레버를 격리하기 위함). 기본값(커플링 0.5)에서는 절대 P_negate가 약 3–4%p 낮지만,
-최적점·임계·경향 등 결론은 동일하며, 커플링&gt;0이면 인식 저하 효과가 오히려 증폭됩니다.</p>
-</blockquote>
-<h3>예시 — &quot;필요 탐지거리&quot; 도출 (기준 RCS 0.01㎡ 소형 FPV, 발사 개시 3 km)</h3>
-<p><strong>필요 탐지거리는 이제 수식으로 바로 나옵니다</strong> — 스윕할 필요가 없습니다:</p>
-<pre><code>R_required = R_commit + v_t · t_react = 3000 + 32.8 × (6 + 10 + 4) = 3656 m
+<p>기본값에서는 결심 10 s + 발사 지연 4 s이므로 필요 탐지거리는
+<code>3000 + 32.8×14 = 3459.2 m</code>입니다. 레이더 탐지 시점 약 3704 m이므로 3000 m 발사 교리를 지킵니다.</p>
+<h3>4.1 P_detect는 “적시 탐지확률”</h3>
+<pre><code class="language-text">P_detect = 1 − Π(1 − p_d,i),  단 R_scan,i ≥ R_required_detection
 </code></pre>
-<p>기본 레이더(&quot;0.01㎡ @ 3 km, Pd 0.9&quot;)의 탐지 시점은 <strong>3704 m</strong> → 여유 <strong>+48 m(1.5초)</strong>.
-<strong>교리를 간신히 충족</strong>합니다. 조금이라도 나빠지면 탐지 제약으로 넘어갑니다.</p>
-<p><strong>탐지거리 스윕</strong> (발사 개시 3 km 고정, 커플링 0):</p>
+<p><code>P_detect</code>는 진입거리부터 <strong>필요 탐지거리까지</strong> 예정된 독립 스캔만 누적합니다. 필요 탐지거리를 지난 뒤의 탐지는
+교리상 발사거리를 지키기에 늦으므로 무력화 확률의 탐지 게이트에 넣지 않습니다.</p>
+<ul>
+<li><code>P_detect · 적시 누적</code>: P_negate에 실제로 사용하는 값</li>
+<li><code>적시 미탐지 위험</code>: <code>1 − P_detect</code></li>
+<li><code>Keep-out 전 누적 탐지</code>: 늦게라도 추적할 가능성을 보여주는 참고값이며 P_negate에는 미사용</li>
+</ul>
+<p>기본값은 적시 구간에 78회의 독립 스캔이 있어 <code>P_detect ≈ 99.99996%</code>, 적시 미탐지 위험은 약 <code>0.00004%</code>입니다.
+따라서 화면상 거의 100%에 가깝지만 정확히 100%로 고정된 값은 아닙니다. 반면 기준 탐지거리를 1 km로 낮추면
+keep-out 전 누적 탐지는 여전히 거의 100%여도 적시 P_detect는 약 2.74%로 떨어집니다.</p>
+<h2>5. 발사 후 EO 상대거리 모델</h2>
+<p><code>EO 과업 완료 상대거리</code>는 보호 자산에서 표적까지의 거리가 아닙니다. AB-U10에 탑재된 카메라와 표적 사이의 상대 LOS 거리입니다. 여기서 과업은 선택한 EO 탐지·인식·식별 중 하나입니다.</p>
+<p>현재 1차 모델은 두 기체가 같은 방사선·고도에서 정면 접근한다고 가정합니다.</p>
+<pre><code class="language-text">v_closing = v_interceptor + v_target
+D_EO,start = D_EO,complete + v_closing · t_EO
+t_EO,start_after_launch = (D_launch − D_EO,start) / v_closing
+t_EO,complete_after_launch = (D_launch − D_EO,complete) / v_closing
+t_remaining_to_intercept = D_EO,complete / v_closing
+</code></pre>
+<p>EO 처리 시작이 발사 전으로 계산되거나 선택한 탐지/인식/식별 과업 완료가 요격 뒤로 넘어가면 시간선 불성립이며, EO가 요구되는 시나리오의 <code>P_terminal EO</code>는 0이 됩니다.</p>
+<h3>기본값 500 m 사례</h3>
+<p>기본 위협 속도 32.8 m/s, AB-U10 속도 50 m/s, EO 처리 6 s, 발사 3000 m일 때:</p>
 <table>
 <thead>
 <tr>
-<th>기준 탐지거리 (Pd 0.9)</th>
-<th>탐지 시점</th>
-<th>탐지 여유</th>
-<th>분류 거리</th>
-<th>P_classify</th>
-<th>P_reach</th>
-<th>P_negate</th>
+<th>사건</th>
+<th align="right">발사 후 시각</th>
+<th align="right">카메라–표적 상대거리</th>
+<th align="right">자산 기준 표적/U10 위치</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>1.0 km</td>
-<td>1703 m</td>
-<td>−1953 m ⚠</td>
-<td>1509 m</td>
-<td>54.9%</td>
-<td>74.6%</td>
-<td>36.5%</td>
+<td>AB-U10 발사</td>
+<td align="right">T+0</td>
+<td align="right">3000 m</td>
+<td align="right">3000 m / 0 m</td>
 </tr>
 <tr>
-<td>1.2 km</td>
-<td>1900 m</td>
-<td>−1756 m ⚠</td>
-<td>1705 m</td>
-<td>53.4%</td>
-<td>89.5%</td>
-<td>42.7%</td>
+<td>EO 처리 시작</td>
+<td align="right">T+24.2 s</td>
+<td align="right">996.8 m</td>
+<td align="right">2206.5 m / 1209.7 m</td>
 </tr>
 <tr>
-<td><strong>1.5 km</strong></td>
-<td>2195 m</td>
-<td>−1461 m ⚠</td>
-<td>2000 m</td>
-<td>50.7%</td>
-<td>98.4%</td>
-<td><strong>44.5%</strong></td>
+<td>EO 과업 완료</td>
+<td align="right">T+30.2 s</td>
+<td align="right">500 m</td>
+<td align="right">2009.7 m / 1509.7 m</td>
 </tr>
 <tr>
-<td>2.0 km</td>
-<td>2687 m</td>
-<td>−969 m ⚠</td>
-<td>2492 m</td>
-<td>44.8%</td>
-<td>100%</td>
-<td>40.0%</td>
-</tr>
-<tr>
-<td>2.5 km</td>
-<td>3212 m</td>
-<td>−444 m ⚠</td>
-<td>3016 m</td>
-<td>37.5%</td>
-<td>100%</td>
-<td>33.4%</td>
-</tr>
-<tr>
-<td><strong>3.0 km(기본)</strong></td>
-<td>3704 m</td>
-<td><strong>+48 m</strong></td>
-<td>3460 m</td>
-<td>31.1%</td>
-<td>100%</td>
-<td><strong>27.8%</strong></td>
-</tr>
-<tr>
-<td>3.5 km</td>
-<td>4196 m</td>
-<td>+540 m</td>
-<td>3460 m</td>
-<td>31.1%</td>
-<td>100%</td>
-<td>27.8%</td>
-</tr>
-<tr>
-<td>4.0 km</td>
-<td>4688 m</td>
-<td>+1032 m</td>
-<td>3460 m</td>
-<td>31.1%</td>
-<td>100%</td>
-<td>27.8%</td>
-</tr>
-<tr>
-<td>5.0 km</td>
-<td>5705 m</td>
-<td>+2049 m</td>
-<td>3460 m</td>
-<td>31.1%</td>
-<td>100%</td>
-<td>27.8%</td>
+<td>예상 요격</td>
+<td align="right">T+36.2 s</td>
+<td align="right">0 m</td>
+<td align="right">약 1811.6 m</td>
 </tr>
 </tbody></table>
-<p><strong>읽는 법 — 두 구간을 절대 섞어 읽지 마세요:</strong></p>
-<ul>
-<li><strong>3.0 km 이상 (교리 지배)</strong>: <strong>완전히 평평(27.8%)</strong>. 탐지 성능을 사도 P_negate는 1%p도 안 오르고
-<strong>여유(마진)만 삽니다.</strong> → <em>탐지 요구사항은 &quot;3.66 km 확보&quot;이고, 그 이상은 강건성 투자지 성능 투자가 아님.</em></li>
-<li><strong>3.0 km 미만 (탐지 제약)</strong>: 표가 &quot;레이더가 나쁠수록 P_negate가 높다&quot;고 말합니다. <strong>레이더를 나쁘게
-사라는 뜻이 아닙니다.</strong> 늦은 탐지가 교전을 안쪽으로 끌어당겨 EO 분류가 쉬워지는 것뿐이고, 이는
-<strong>3 km 발사 개시 거리 자체가 P_negate 기준으로 최적이 아니라는 신호</strong>입니다(아래 절). 대신 여기서는
-<strong>P_reach가 무너집니다</strong>(1.2 km에서 89.5%, 1.0 km에서 74.6%) — 요격이 keep-out 안쪽으로 밀립니다.</li>
-</ul>
-<p><strong>해석</strong>: 병목은 여전히 탐지가 아니라 <strong>EO 분류</strong>(기본 P_classify 31.1%). 3 km 교리가 EO에 <strong>3.46 km 인식</strong>을
-요구하기 때문입니다. → &quot;탐지 요구사항 3.66 km, 자원은 EO에.&quot;</p>
-<p>RCS가 다르면 R∝RCS^¼로 환산(RCS 16배 → 필요 거리 2배).</p>
-<h3>예시 — &quot;발사 개시 거리&quot; 트레이드 (교리 vs 효과도)</h3>
-<p>발사 개시 거리는 <strong>표준(대응 거리)</strong> 이자 이 모델에서 가장 강한 단일 레버입니다. 멀리서 쏘면 standoff를 벌지만
-EO가 그만큼 먼 거리에서 인식해야 합니다. (레이더 3 km @ Pd 0.9 고정, 커플링 0)</p>
-<table>
-<thead>
-<tr>
-<th>발사 개시 거리</th>
-<th>필요 탐지거리</th>
-<th>탐지 충족</th>
-<th>분류 거리</th>
-<th>인식</th>
-<th>요격 거리</th>
-<th>Keep-out 여유</th>
-<th>P_negate</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>800 m</td>
-<td>1456 m</td>
-<td>✓</td>
-<td>1262 m</td>
-<td>99.8%</td>
-<td>483 m</td>
-<td><strong>−17 m</strong></td>
-<td>23.5%</td>
-</tr>
-<tr>
-<td>1000 m</td>
-<td>1656 m</td>
-<td>✓</td>
-<td>1462 m</td>
-<td>99.4%</td>
-<td>604 m</td>
-<td>104 m</td>
-<td>34.4%</td>
-</tr>
-<tr>
-<td>1250 m</td>
-<td>1906 m</td>
-<td>✓</td>
-<td>1711 m</td>
-<td>98.3%</td>
-<td>755 m</td>
-<td>255 m</td>
-<td>42.8%</td>
-</tr>
-<tr>
-<td><strong>1475 m</strong></td>
-<td>2130 m</td>
-<td>✓</td>
-<td>1936 m</td>
-<td>96.6%</td>
-<td>891 m</td>
-<td>391 m</td>
-<td><strong>44.6% ← 최적</strong></td>
-</tr>
-<tr>
-<td>1750 m</td>
-<td>2406 m</td>
-<td>✓</td>
-<td>2211 m</td>
-<td>93.6%</td>
-<td>1057 m</td>
-<td>557 m</td>
-<td>43.0%</td>
-</tr>
-<tr>
-<td>2000 m</td>
-<td>2656 m</td>
-<td>✓</td>
-<td>2461 m</td>
-<td>89.7%</td>
-<td>1208 m</td>
-<td>708 m</td>
-<td>40.3%</td>
-</tr>
-<tr>
-<td>2500 m</td>
-<td>3156 m</td>
-<td>✓</td>
-<td>2960 m</td>
-<td>79.7%</td>
-<td>1510 m</td>
-<td>1010 m</td>
-<td>34.1%</td>
-</tr>
-<tr>
-<td><strong>3000 m(기본)</strong></td>
-<td>3656 m</td>
-<td>✓</td>
-<td>3460 m</td>
-<td>68.1%</td>
-<td>1812 m</td>
-<td>1312 m</td>
-<td><strong>27.8%</strong></td>
-</tr>
-<tr>
-<td>3500 m</td>
-<td>4156 m</td>
-<td>✗ 부족</td>
-<td>3508 m</td>
-<td>66.9%</td>
-<td>1841 m</td>
-<td>1341 m</td>
-<td>27.2%</td>
-</tr>
-</tbody></table>
-<ul>
-<li><strong>P_negate 최적 ≈ 1.5 km (44.6%)</strong>. 3 km 교리는 여기서 <strong>−16.8%p</strong>를 지불합니다.</li>
-<li>1 km 아래로 내려가면 요격점이 keep-out(500 m)에 붙어 <strong>P_reach가 무너집니다</strong> — 내부 최적이 존재하는 이유.</li>
-<li><strong>그럼 1.5 km로 바꿔야 하나? 아닙니다.</strong> P_negate는 &quot;무력화했나&quot;만 셉니다. 3 km를 고르는 이유
-— 파편·낙하물 standoff, 2차 교전 기회, keep-out 여유 1312 m — 는 <strong>이 지표 바깥</strong>에 있습니다.
-이 표는 &quot;3 km 교리의 <strong>가격표</strong>가 −16.8%p&quot;라는 사실을 보여주는 것이고, 그 값을 지불할지는 교리 판단입니다.</li>
-</ul>
-<p><strong>3 km를 유지하려면 EO에 무엇을 요구해야 하나</strong> (합성 지향오차 σ 스윕, 발사 개시 3 km 고정):</p>
-<table>
-<thead>
-<tr>
-<th>지향오차 σ</th>
-<th>P_acq</th>
-<th>인식</th>
-<th>P_negate</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>0.5°(기본)</td>
-<td>67.5%</td>
-<td>68.1%</td>
-<td>27.8%</td>
-</tr>
-<tr>
-<td>0.4°</td>
-<td>82.8%</td>
-<td>68.1%</td>
-<td>34.0%</td>
-</tr>
-<tr>
-<td>0.3°</td>
-<td>95.6%</td>
-<td>68.1%</td>
-<td>39.3%</td>
-</tr>
-<tr>
-<td>0.2°</td>
-<td>99.9%</td>
-<td>68.1%</td>
-<td>41.1%</td>
-</tr>
-<tr>
-<td>0.1°</td>
-<td>100%</td>
-<td>68.1%</td>
-<td><strong>41.1% ← 상한</strong></td>
-</tr>
-</tbody></table>
-<p>⚠ <strong>지향 정밀도를 완벽하게 만들어도 3 km 교리에서는 41.1%가 상한</strong>입니다. 인식확률이 68.1%에 고정돼 있기
-때문 — 3.46 km에서 표적 픽셀이 7.4 px뿐입니다. <strong>3 km 교리로 40%+를 넘기려면 지향(σ)만으로는 부족하고,
-해상도·화각·표적크기 쪽 픽셀 예산을 같이 올려야 합니다.</strong></p>
-<h3>예시 — &quot;EO 분류 필요 스펙&quot; 도출 (지향오차 · 화각)</h3>
-<p>기본 시나리오의 병목은 EO 분류(P_classify 31.1%, P_acq 67.5%, 인식 68.1%, σ=0.50°).
-3 km 교리가 분류를 3.46 km로 밀어놓은 상태에서, 무엇을 얼마나 개선해야 하나? (커플링 0)</p>
-<p><strong>① 요격기 지향오차 — P_acq 경로 (단조, 큐 오차 0.3° 고정):</strong></p>
-<table>
-<thead>
-<tr>
-<th>지향오차</th>
-<th>합성 σ</th>
-<th>P_acq</th>
-<th>P_classify</th>
-<th>P_negate</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>0.1°</td>
-<td>0.32°</td>
-<td>94%</td>
-<td>43.3%</td>
-<td>38.6%</td>
-</tr>
-<tr>
-<td>0.2°</td>
-<td>0.36°</td>
-<td>89%</td>
-<td>40.8%</td>
-<td>36.4%</td>
-</tr>
-<tr>
-<td>0.4°(기본)</td>
-<td>0.50°</td>
-<td>68%</td>
-<td>31.1%</td>
-<td>27.8%</td>
-</tr>
-<tr>
-<td>0.6°</td>
-<td>0.67°</td>
-<td>46%</td>
-<td>21.4%</td>
-<td>19.1%</td>
-</tr>
-<tr>
-<td>0.9°</td>
-<td>0.95°</td>
-<td>27%</td>
-<td>12.4%</td>
-<td>11.0%</td>
-</tr>
-</tbody></table>
-<p>스펙 역산(목표 → 허용 <strong>최대</strong> 지향오차): 30% → <strong>≤0.35°</strong> · 35% → <strong>≤0.23°</strong> · <strong>40% → 달성 불가</strong>.
-⚠ 지향오차를 0으로 만들어도(P_acq=100%) <strong>3 km 교리에서는 41.1%가 천장</strong>입니다 — 인식이 68.1%에 묶여 있어서.</p>
-<p><strong>② 화각 — P_acq ↔ 인식 상충 (비단조):</strong></p>
-<table>
-<thead>
-<tr>
-<th>화각</th>
-<th>P_acq</th>
-<th>인식</th>
-<th>표적 픽셀</th>
-<th>P_negate</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>0.8°</td>
-<td>27%</td>
-<td>97%</td>
-<td>13.9 px</td>
-<td>16.1%</td>
-</tr>
-<tr>
-<td>1.0°</td>
-<td>39%</td>
-<td>92%</td>
-<td>11.1 px</td>
-<td>21.9%</td>
-</tr>
-<tr>
-<td>1.2°</td>
-<td>51%</td>
-<td>84%</td>
-<td>9.3 px</td>
-<td>26.0%</td>
-</tr>
-<tr>
-<td><strong>1.46°</strong></td>
-<td>66%</td>
-<td>70%</td>
-<td>7.6 px</td>
-<td><strong>27.8% ← 최적</strong></td>
-</tr>
-<tr>
-<td>1.5°(기본)</td>
-<td>68%</td>
-<td>68%</td>
-<td>7.4 px</td>
-<td>27.8%</td>
-</tr>
-<tr>
-<td>2.0°</td>
-<td>86%</td>
-<td>44%</td>
-<td>5.6 px</td>
-<td>22.8%</td>
-</tr>
-<tr>
-<td>2.5°</td>
-<td>96%</td>
-<td>28%</td>
-<td>4.5 px</td>
-<td>16.0%</td>
-</tr>
-</tbody></table>
-<p>기본 1.5°가 사실상 최적(1.46°) → <strong>화각 튜닝 여지 없음(+0.0%p)</strong>. 화각은 P_acq와 인식을 맞바꿀 뿐,
-<strong>픽셀 총량을 늘리지 못하기 때문</strong>입니다.</p>
-<p><strong>③ 해상도 — 픽셀 예산을 실제로 늘리는 유일한 레버:</strong></p>
-<table>
-<thead>
-<tr>
-<th>가로 해상도</th>
-<th>표적 픽셀</th>
-<th>인식</th>
-<th>P_negate</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>1920 px(기본)</td>
-<td>7.4 px</td>
-<td>68%</td>
-<td>27.8%</td>
-</tr>
-<tr>
-<td>2560 px</td>
-<td>9.9 px</td>
-<td>87%</td>
-<td>35.6%</td>
-</tr>
-<tr>
-<td>3840 px</td>
-<td>14.8 px</td>
-<td>98%</td>
-<td>40.1%</td>
-</tr>
-<tr>
-<td>5120 px</td>
-<td>19.8 px</td>
-<td>100%</td>
-<td>40.7%</td>
-</tr>
-<tr>
-<td>7680 px</td>
-<td>29.7 px</td>
-<td>100%</td>
-<td><strong>40.8% ← 포화</strong></td>
-</tr>
-</tbody></table>
-<p><strong>결론(요구사항) — 짐벌 미도입(확정) + 발사 개시 3 km 전제:</strong></p>
-<p>이전 판의 결론(&quot;지향 정밀도가 유일한 핵심 레버&quot;)은 <strong>3 km 교리에서는 더 이상 충분하지 않습니다.</strong>
-지향(σ)과 픽셀(해상도)은 <strong>각각 독립적인 천장</strong>을 만듭니다:</p>
-<ul>
-<li><strong>σ만 개선</strong> → P_acq→100%, 인식 68% 고정 → <strong>천장 41.1%</strong></li>
-<li><strong>해상도만 개선</strong> → 인식→100%, P_acq 67.5% 고정 → <strong>천장 40.8%</strong></li>
-<li><strong>둘 다 필요</strong> — 40%대 초반을 넘으려면 σ≤0.3° <strong>와</strong> 해상도 상향을 <strong>동시에</strong> 가야 합니다.</li>
-</ul>
-<p>세 번째 선택지가 <strong>발사 개시 거리를 당기는 것</strong>입니다(1.48 km → 44.6%, 하드웨어 변경 없음).
-standoff와 맞바꾸는 교리 결정이므로, EO 하드웨어 투자와 <strong>같은 저울에 올려놓고 비교</strong>해야 합니다.</p>
-<h2>4. 파라미터 그룹</h2>
-<ul>
-<li><strong>위협</strong>: RCS, 속도, 고도 AGL, 진입거리, 진입방위, 표적크기</li>
-<li><strong>레이더</strong>: 기준 RCS, 기준 탐지거리, <strong>탐지거리 Pd</strong>, 재방문 주기, 분류 시간, 분류기 상한
-· <em>고급(접이식·곡선 형태)</em>: 최대 Pd, 전이 폭</li>
-<li><strong>EO/IR</strong>: 화각, 해상도, 센서폭, <strong>요구 판별 수준(교전 기준)</strong>, 인식·식별 N50, 레이더 큐 오차, 요격기 지향 오차, 대기 시정</li>
-<li><strong>이팩터</strong>: 페이로드(택일), 발사 지연, 순항속도, <strong>발사 개시 거리(교리)</strong>,
-요격기 도달 반경(≠넷건 사거리·≠발사 개시 거리), 발사대 거리,
-<strong>단발 Pk·net / ·shotgun(독립 입력, 페이로드가 선택한 쪽만 P_kill에 사용 — 활성 강조 표시)</strong>,
-사격 기회, 체공 시간, 여유 σ</li>
-<li><strong>C2</strong>: 결심 지연, 결심 신뢰도, <strong>결심-인식 커플링</strong>(인식 애매 시 결심 신뢰도 저하 정도),
-<strong>오교전 위험 모델(옵션)</strong> — 켜면 비위협 유입률·오통과율(탐지/인식/식별) 노출</li>
-<li><strong>사이트</strong>: keep-out 반경, 자산 위경도</li>
-</ul>
-<h2>5. 결과 읽기</h2>
-<ul>
-<li><strong>교전 효과도</strong>: P_negate/누수 + 교전 성립, 제약 단계 카드, 킬체인 막대, EO/IR 인식·획득 readout, 교전 기하 타임라인.
-해석식 ↔ <strong>몬테카를로</strong> 전환 가능.<ul>
-<li>교전 기하 카드 상단이 <strong>교리 지배 / ⚠ 탐지 제약</strong> 중 어느 상태인지 먼저 알려줍니다.</li>
-<li><strong>탐지 거리(사양 Pd 기준)</strong> = 입력한 인용 거리를 위협 RCS로 환산한 값 / <strong>Pd 50% 거리</strong> = 내부 곡선 중심(역산값).</li>
-<li><strong>필요 탐지거리 · 탐지 여유</strong> = 교리 충족 판정. 여유가 음수면 ⚠ 탐지 제약이며 병목 진단이 부족분을 짚습니다.</li>
-</ul>
-</li>
-<li><strong>방어 커버리지</strong>: 360° 스윕 footprint 지도 + 평균 P_negate. (모델 회전대칭 → 전 방위 동일, 병목도 동일)</li>
-<li><strong>트레이드 스터디</strong>: 파라미터 vs P_negate 1D/2D 스윕 + 민감도 토네이도.</li>
-<li><strong>스펙 역산</strong>: 목표 P_negate를 만족하는 파라미터 임계값 역산.</li>
-<li><strong>시나리오 비교</strong>: 현재(A) vs 프리셋/저장본(B) 지표 나란히 + Δ(개선=초록·악화=빨강).</li>
-<li><strong>파라미터 설명</strong>: 전 파라미터 의미·값 출처 표 + 행별 &quot;수식·그림&quot;.</li>
-</ul>
-<p><strong>입력 검증</strong> — 좌측 패널 상단에 배너가 뜨면 값을 먼저 확인하세요. 🔴 <strong>오류</strong>는 물리적으로 불가능한 값
-(확률 &gt;1, 음수 거리 등)으로, <strong>수치 분석과 JSON/MD 리포트 생성을 중단</strong>합니다. 🟠 <strong>경고</strong>는 계산은 되지만
-의도와 다를 수 있는 조합입니다. <code>↺ 범위로 자동 수정</code>으로 한 번에 되돌릴 수 있습니다 — FAQ Q13.</p>
-<h2>6. 시나리오 운용</h2>
-<ul>
-<li><strong>프리셋</strong>: 소형 FPV(기본)·고속 고정익·저피탐 초소형·근거리 급습·안개 저시정·야간 EO 저하</li>
-<li><strong>저장/불러오기</strong>: 현재 값을 이름 붙여 localStorage에 저장, 드롭다운에서 로드/삭제</li>
-<li><strong>A/B 비교</strong>: 시나리오 비교 탭에서 B 선택</li>
-</ul>
-<h2>7. 입출력</h2>
-<ul>
-<li><strong>CSV 저장/불러오기</strong>: 열 = 구분·파라미터·key·값·단위·의미·값 출처·수식·이론 근거·모델 가정.
-첫 줄 <code>sep=,</code>로 Excel 열 밀림 방지, UTF-8 BOM으로 한글 정상. Excel에서 <strong>값 열만</strong> 수정 후 다시 불러오기.<ul>
-<li><strong>범위 검증</strong>: 불러올 때 유효 범위를 벗어난 값이 있으면 목록으로 알려줍니다(값은 적용되어 패널에서 바로 보이고
-고칠 수 있음). 확률이 0.95→95로 바뀌는 엑셀 서식 사고가 가장 흔합니다 — FAQ Q13.</li>
-</ul>
-</li>
-<li><strong>⤓샘플</strong>: 기본 시나리오 샘플 CSV 다운로드(포맷·근거 참조용).</li>
-<li><strong>JSON / 리포트(MD)</strong>: 전체 결과+입력(JSON) / 사람이 읽는 리포트(MD, EO/IR 획득 섹션 + 파라미터 근거 부록 포함).
-입력 오류가 하나라도 있으면 잘못된 결과가 산출물로 유통되지 않도록 두 버튼이 비활성화됩니다.</li>
-</ul>
-<h2>8. 몬테카를로 설계 — 어떤 변수에 오차가 들어가나</h2>
-<p>두 종류의 불확실성이 있습니다.</p>
-<h3>8.0 시행수 — 얼마나 돌려야 하나 (기본 10,000)</h3>
-<p>MC 1 시행은 <strong>해석식 <code>computeMoe</code> 1회</strong>(탐지 스윕 168 look + 닫힌 해 공식 십여 개)라 <strong>약 0.02 ms</strong>입니다.
-물리 시뮬레이션이 아니라 산수라서 매우 빠릅니다 — 결과가 순식간에 나오는 건 정상입니다.</p>
-<table>
-<thead>
-<tr>
-<th>시행수</th>
-<th>소요(참고)</th>
-<th>95% CI 반폭</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>1,000</td>
-<td>21 ms</td>
-<td>±2.61%p</td>
-</tr>
-<tr>
-<td>3,000</td>
-<td>63 ms</td>
-<td>±1.50%p</td>
-</tr>
-<tr>
-<td><strong>10,000(기본)</strong></td>
-<td><strong>204 ms</strong></td>
-<td><strong>±0.82%p</strong></td>
-</tr>
-<tr>
-<td>100,000</td>
-<td>2.0 s</td>
-<td>±0.26%p</td>
-</tr>
-</tbody></table>
-<ul>
-<li>CI 폭은 <strong>1/√n</strong>로 줄어듭니다. 시행수를 4배 늘려야 오차가 절반이 됩니다.</li>
-<li><strong>기본이 10,000인 이유</strong>: 이 도구는 시나리오 간 <strong>몇 %p 차이</strong>를 비교하는 데 씁니다.
-3,000(±1.5%p)에서는 그 차이가 표본오차에 묻힙니다. CI 반폭이 ±1%p를 넘으면 화면에 경고가 뜹니다.</li>
-<li><strong>상한 200,000</strong> — MC는 렌더 스레드에서 동기로 돌기 때문에, 시행수가 크면 그동안 화면이 멈춥니다.</li>
-<li>같은 seed면 결과가 <strong>완전히 재현</strong>됩니다(mulberry32 시드 RNG). seed를 바꿔 흔들림 폭을 눈으로 확인하세요.</li>
-</ul>
-<p>⚠ <strong>정밀도 착시 주의</strong> — CI는 <strong>표본오차만</strong> 나타냅니다. 100,000회로 ±0.26%p를 만들어도
-입력값 대부분이 가정·플레이스홀더인 사실은 그대로입니다(§8.3). <strong>시행수를 늘려도 그 불확실성은 줄지 않습니다.</strong></p>
-<h3>8.1 Aleatory(시행마다 물리적 변동) — 현재 MC가 난수화하는 입력</h3>
-<table>
-<thead>
-<tr>
-<th>변수</th>
-<th>분포</th>
-<th>기본 오차</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>위협 속도</td>
-<td>정규(승법) CV</td>
-<td>0.15</td>
-</tr>
-<tr>
-<td>RCS</td>
-<td>로그정규 σ</td>
-<td>0.4</td>
-</tr>
-<tr>
-<td>진입 방위</td>
-<td>균등 0–360°</td>
-<td>on</td>
-</tr>
-<tr>
-<td>분류 시간</td>
-<td>정규(가법) sd</td>
-<td>2 s</td>
-</tr>
-<tr>
-<td>결심 지연</td>
-<td>정규(가법) sd</td>
-<td>4 s</td>
-</tr>
-<tr>
-<td>발사 지연</td>
-<td>정규(가법) sd</td>
-<td>1 s</td>
-</tr>
-<tr>
-<td>요격기 지향 오차</td>
-<td>정규(가법) sd</td>
-<td>0.15°</td>
-</tr>
-<tr>
-<td>대기 시정</td>
-<td>정규(승법) CV</td>
-<td>0.25</td>
-</tr>
-<tr>
-<td>위협 고도</td>
-<td>정규(가법) sd</td>
-<td>40 m</td>
-</tr>
-<tr>
-<td>표적 크기</td>
-<td>정규(승법) CV</td>
-<td>0.20</td>
-</tr>
-<tr>
-<td>레이더 큐 오차</td>
-<td>정규(가법) sd</td>
-<td>0.1°</td>
-</tr>
-<tr>
-<td>순항속도</td>
-<td>정규(승법) CV</td>
-<td>0.05</td>
-</tr>
-<tr>
-<td>사격 기회 수</td>
-<td>정규(가법)·반올림 sd</td>
-<td>0.7</td>
-</tr>
-</tbody></table>
-<ul>
-<li>킬체인 5게이트는 매 시행 <strong>베르누이 결과</strong>로 실현(확률→성공/실패).</li>
-</ul>
+<p>따라서 <code>인식 완료 상대거리 500 m</code>는 발사를 41 m로 바꾸지 않습니다. 발사는 3000 m로 유지되고, 인식 완료 뒤 요격까지 약 6.0 s가 남습니다.</p>
+<h2>6. EO/IR 설계 탭 — 거리·픽셀에서 화각 역산</h2>
+<p>질문은 다음과 같습니다.</p>
 <blockquote>
-<p>모든 기본 오차값은 SME-VERIFY 플레이스홀더입니다. <code>DEFAULT_UNCERTAINTY</code>(montecarlo.ts)에서 조정.</p>
+<p>“카메라–표적 상대 LOS 거리 R에서, 크기 S인 표적을 가로 N픽셀로 보려면 수평 화각이 얼마여야 하는가?”</p>
 </blockquote>
-<h3>8.2 미반영 → 반영으로의 차이 (정확히)</h3>
-<p>변수를 <code>sampleScenario</code>에 배선하면 매 시행 새 값을 뽑습니다. 이때 두 가지가 달라집니다:</p>
+<pre><code class="language-text">IFOV = target_size / (camera_target_range · target_pixels)
+HFOV_rad = IFOV · horizontal_resolution
+N_pixels = target_size · horizontal_resolution / (camera_target_range · HFOV_rad)
+</code></pre>
+<p>작은 각도 픽셀 모델을 정확히 역산하므로, 설계 탭의 <code>역산 검산</code>은 입력 픽셀 수와 일치합니다.</p>
+<h3>예시 A — 0.35 m 표적</h3>
 <ul>
-<li><strong>시행별 P_negate 히스토그램 폭</strong> ↑ (입력 변동이 분포에 나타남)</li>
-<li><strong>평균(mean) 이동</strong> — 모델이 비선형/비대칭이면 평균 자체가 움직임.
-예: 고도(경사거리 볼록)·표적크기 변동은 불리한 쪽 페널티가 더 가팔라 <strong>평균 P_negate를 끌어내림</strong>
-(실측 예: 후보 반영 시 평균 37%→33%).</li>
+<li>가로 해상도: 1920 px</li>
+<li>표적 크기: 0.35 m</li>
+<li>카메라–표적 상대거리: 500 m</li>
+<li>목표: 20 px</li>
 </ul>
+<p>결과는 HFOV 약 <code>3.85°</code>, IFOV <code>35 µrad/px</code>, 센서 폭 6.4 mm 기준 초점거리 약 <code>95.2 mm</code>입니다.</p>
+<h3>예시 B — 2 m 표적</h3>
+<p>같은 1920 px·500 m·20 px 조건에서 표적 크기만 2 m이면 HFOV는 약 <code>22.00°</code>입니다.</p>
+<p>표적이 커질수록 같은 거리와 픽셀 요구를 만족하는 화각을 더 넓게 사용할 수 있습니다.</p>
 <blockquote>
-<p>주의 — 도구의 <strong><code>ci95</code>는 &quot;무력화 <em>분율</em>&quot;의 몬테카를로 표본오차</strong>(≈1.96·√(p(1−p)/n))로,
-주로 <strong>시행 수 n</strong>이 지배합니다. 입력 변동을 늘려도 이 분율 CI 폭은 크게 안 변합니다
-(그건 시행별 P_negate <strong>히스토그램</strong>과 <strong>평균</strong>에 나타남). CI를 좁히려면 시행 수를 늘리세요(§8.0).</p>
+<p>주의: 입력 500 m는 이미 카메라–표적 LOS입니다. 자산 기준 표적 고도 85 m를 다시 피타고라스 합성하지 않습니다.</p>
 </blockquote>
-<p>위 표는 현재 반영된 aleatory 입력 전체입니다. 미반영이면 고정값이라 그 변수의 변동이 분포·평균에 0 기여(과신).</p>
-<h3>8.3 Epistemic(값 자체를 모름 — 플레이스홀더) — 현재 미반영, 실측 전까지 사실상 지배적</h3>
+<p><code>계산 화각 적용</code> 버튼은 역산한 화각과 종말 EO 설정만 시나리오에 반영하며, 좌측의 발사 개시 거리는 변경하지 않습니다.</p>
+<h2>7. 레이더 탐지와 EO 탐지·인식·식별 정의</h2>
+<p>이 도구에는 서로 다른 두 종류의 “탐지”가 있습니다. 둘을 같은 의미로 사용하면 안 됩니다.</p>
 <ul>
-<li><strong>단발 Pk</strong>, <strong>N50(탐지/인식/식별)</strong>, <strong>기준 탐지거리</strong>, <strong>결심 신뢰도</strong>, <strong>분류기 상한</strong></li>
-<li>이 값들은 &quot;입력 필요&quot; 상태라 불확실성이 큼. 정식 MC 설계 시 이들에 대한 <strong>파라미터 사전분포</strong>를 별도로 두는 것을 권장(aleatory와 분리).</li>
+<li><strong>레이더 적시 탐지 <code>P_detect</code></strong>: 지상 레이더가 발사 교리를 지킬 수 있는 마감선 전에 위협 트랙을 한 번 이상 확보할 확률.</li>
+<li><strong>EO 탐지</strong>: 발사 후 요격기 카메라 영상에서 관심 물체가 존재함을 발견하는 영상 과업. 물체 종류 판단은 아직 하지 않음.</li>
 </ul>
-<h3>8.4 주의 — 이중 계산</h3>
-<p><code>여유 σ</code>(reach_margin_sigma_m)는 해석식에서 P_reach를 이미 연속화합니다. MC에서는 속도·타이밍
-입력을 난수화해 여유가 또 흔들리므로 <strong>부분 이중 계산</strong>이 됩니다. 정식 MC에서는 (a) 여유 σ=0으로 두고
-입력 난수가 도달 변동을 만들게 하거나, (b) σ를 &quot;모델 외 잔여 지터&quot;로만 해석하도록 정하세요.</p>
-<h2>9. 값·근거 방침</h2>
+<p>발사 후 종말 확인 정책은 다음 네 가지입니다.</p>
+<table>
+<thead>
+<tr>
+<th>정책</th>
+<th>이 도구의 정의</th>
+<th align="right">Johnson 50% 기준</th>
+<th align="right">기본 픽셀 환산</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>EO 미적용 · 레이더 추적만</td>
+<td>EO 성공 게이트를 사용하지 않고, 적시 탐지 후 레이더 트랙 유효 신뢰도만 적용</td>
+<td align="right">해당 없음</td>
+<td align="right">해당 없음</td>
+</tr>
+<tr>
+<td>EO 탐지</td>
+<td>관심 물체 존재 발견</td>
+<td align="right">1.0±0.25 cycle</td>
+<td align="right">2 px</td>
+</tr>
+<tr>
+<td>EO 인식</td>
+<td>표적 클래스 구분: 드론/조류 또는 위협 유형</td>
+<td align="right">4.0±0.8 cycle</td>
+<td align="right">8 px</td>
+</tr>
+<tr>
+<td>EO 식별</td>
+<td>클래스 내부 특정 기종·모델/개체군 구분</td>
+<td align="right">6.4±1.5 cycle</td>
+<td align="right">12.8 px</td>
+</tr>
+</tbody></table>
+<p>Johnson 값은 <strong>표적 임계 치수를 가로지르는 resolved cycle 수에서 관측자가 해당 과업을 50% 성공하는 경험 기준</strong>입니다.
+이 도구는 디지털 표본화의 최소 환산으로 <code>1 cycle≈2 px</code>를 사용합니다. 자동분류기의 실제 ROC 보장값이 아니므로
+드론/조류·기종별 영상시험 결과가 있으면 세 N50을 교체해야 합니다.</p>
+<h3>7.1 EO 종말 판별 확률</h3>
+<p>EO 탐지·인식·식별 중 하나가 요구될 때:</p>
+<pre><code class="language-text">P_terminal EO = P_acq × P_Johnson × T_atmosphere × EO_task_ceiling
+</code></pre>
 <ul>
-<li><strong>값 출처</strong>: 미확정은 &quot;가정·입력값(미확정, 편집 가능)&quot;. 추측값을 사실처럼 넣지 않음. 참고 대표값은 &quot;참고:&quot;로만 표기.</li>
-<li><strong>근거 3분리</strong>: 이론 근거(실제 문헌·표준) / 모델 가정 / 값 출처 — ⓘ 팝업·CSV·리포트에 모두 반영.</li>
-<li>실측/스펙 확보 시: <code>src/analysis/model.ts</code>의 <code>DEFAULT_*</code> + <code>src/analysis/params.ts</code>의 <code>source</code>를 값+출처로 교체.</li>
+<li>표적 픽셀: <code>N = 크기·가로해상도 / (상대거리·HFOV_rad)</code></li>
+<li>획득 확률: <code>P_acq = 1 − exp(−(HFOV/2)² / (2σ²))</code></li>
+<li>지향 오차: <code>σ = √(레이더 큐 오차² + 요격기 지향 오차²)</code></li>
+<li>대기 투과: Koschmieder + Beer–Lambert 근사</li>
+<li>Johnson N50: 요구 수준에 따라 EO 탐지/인식/식별 N50 중 하나 사용</li>
 </ul>
-<h2>10. 설계 결정·한계·가정</h2>
-<p><strong>확정 설계 결정</strong></p>
+<p><code>P_detect</code>는 마감선 전에 트랙을 얻는 확률이고, <code>레이더 트랙 유효 신뢰도</code>는 이미 얻은 트랙이 교전 선언·사격 지원에 충분하다는 조건부 확률입니다. 같은 시험 지표를 두 값에 반복 입력하면 이중 감점되므로 출처를 분리해야 합니다. <code>EO 과업 신뢰도 상한</code>은 EO 알고리즘/운용자·배경 클러터 등의 잔여 손실이며 레이더 값과 공유하지 않습니다.</p>
+<p>화각을 좁히면 픽셀 수는 늘지만 고정 카메라에서 획득확률이 떨어질 수 있으므로 최적 화각이 존재합니다.</p>
+<p><code>대기 시정</code>은 가시광 Koschmieder 관계를 EO/IR에 공통 적용한 근사입니다. 실제 IR 파장대의 흡수·산란은 다를 수 있으므로 대역별 시험자료가 있으면 교체해야 합니다.</p>
+<p><code>종말 확인 정책=EO 미적용</code>만 EO 성공 게이트를 생략합니다. EO 탐지·인식·식별은 모두 발사 후 EO 시간선과 광학확률을 적용합니다.</p>
+<h2>8. 결과 읽기</h2>
 <ul>
-<li>🔒 <strong>짐벌 미도입</strong> — EO는 기체 고정. 획득 P_acq(고정 FOV)가 상시 적용되며, 지향 정밀도는 레이더 큐+유도로만 확보. (개선 레버가 &quot;짐벌&quot;이 아님을 전제로 요구사항 도출)</li>
+<li><code>발사 시 위협 거리</code>: 자산 기준. 좌측 발사 교리가 실제로 지켜졌는지 확인합니다.</li>
+<li><code>EO 처리 시작/완료 상대거리</code>: AB-U10 카메라–표적 사이 거리입니다.</li>
+<li><code>완료 시 자산 기준 위치</code>: 같은 순간 표적과 U10이 자산에서 각각 얼마나 떨어졌는지 보여줍니다.</li>
+<li><code>EO 완료→요격 여유</code>: 종말 판단 이후 남은 상대 폐쇄 시간입니다.</li>
+<li><code>요격 거리</code>: 자산 기준 예상 회합 위치입니다.</li>
+<li><code>Keep-out 여유</code>: 요격 지점과 방어 경계의 차이입니다.</li>
 </ul>
-<p><strong>미정(향후 결정)</strong></p>
+<h2>9. 분석 기능</h2>
 <ul>
-<li>⏳ <strong>표적 크기(임계 치수)</strong> — 대상 기종 미정. 값은 가정(참고 0.35m)이며, 인식·P_classify에 민감하므로 확정 시 재평가 필요.</li>
+<li>교전 효과도: 해석식 또는 몬테카를로 결과와 병목 진단.</li>
+<li>방어 커버리지: 방위 스윕 기반 평균 P_negate와 방어 비율.</li>
+<li>트레이드 스터디: 1D/2D 스윕과 토네이도 민감도.</li>
+<li>스펙 역산: 목표 P_negate를 만족하는 파라미터 경계 탐색.</li>
+<li>시나리오 비교: 현재값과 프리셋/저장본 A/B 비교.</li>
+<li>CSV/JSON/Markdown 리포트: 입력과 결과 공유.</li>
 </ul>
-<p><strong>모델 한계·가정</strong></p>
+<h2>10. 모델 한계</h2>
 <ul>
-<li><strong>교전은 교리(발사 개시 거리)로 개시</strong>되고 탐지 시점으로 개시되지 않음. 분류 시점도 발사에서 역산 —
-즉 &quot;타임라인이 허용하는 한 가장 가깝게 분류한다&quot;를 가정. 실제로 조기 분류를 강제하는 ROE/절차가 있다면 낙관적.</li>
-<li><strong>탐지 독립 look 가정</strong> — 누적 P_det = 1−Π(1−pd)는 스캔 간 완전 독립을 전제. 실제로는 Swerling 변동 상관,
-지형 차폐·다중경로, 저고도 클러터 노치, 트래커 M-of-N 확정 요구가 있어 <strong>유효 독립 look 수가 훨씬 적습니다.</strong>
-기본값에서 P_detect가 100%로 포화하는 것은 이 가정의 결과이며 <strong>낙관적</strong>입니다 — FAQ Q10 참조.</li>
-<li>교전 closing 기하는 수평 반경(고도는 센싱에만 반영).</li>
-<li>방위 회전대칭(방위별 차이 없음) — 섹터별 keep-out/지형은 미반영.</li>
-<li>단일 표적(스웜 미지원).</li>
-<li>P_decision–인식 커플링은 파라미터로 조절(기본 0.5). 0=독립. 인식이 P_classify도 게이팅하므로 부분 이중계산 가능 — &quot;인간 판단 추가 민감도&quot;로 해석.</li>
-<li>넷건/샷건은 택일 페이로드(동시 레이어 미지원).</li>
+<li>동일 방사선·동일 고도 정면 접근의 스칼라 기하. 횡방향 기동과 3D 자세는 미반영.</li>
+<li>EO 처리시간 동안 속도는 일정하고 처리는 중단 없이 진행된다고 가정.</li>
+<li>카메라는 짐벌 없는 고정 FOV. 큐·지향 오차는 독립 가우시안 근사.</li>
+<li>큐·지향 오차는 단순 방위 1차원이 아니라 등방성 2D 각평면의 축별 1σ로 해석. HFOV만 입력하므로 원형 FOV로 근사하며 실제 사각 프레임의 오차 방향은 보장되지 않음.</li>
+<li>RCS^¼ 관계는 로지스틱 Pd 곡선의 50% 중심거리에 적용하고 전이 폭은 고정. 임의 Pd의 인용거리가 정확히 같은 비율로 이동하는 것은 아님.</li>
+<li>요격기 도달 반경과 속도×체공시간 상한은 현재 코드에서 자산 중심 요격지점 반경과 비교. 발사대에서 실제로 비행한 경로 길이 제한과는 차이가 날 수 있음.</li>
+<li>진입 방위는 현재 축대칭 MOE의 지도/커버리지 방향만 바꾸며 P_negate 자체에는 영향 없음.</li>
+<li>비위협 오통과율은 광학/N50에서 계산하지 않는 독립 조건부 입력. EO 설정을 바꿔도 자동 변경되지 않음.</li>
+<li>Johnson·대기·레이더·Pk 값은 요구사항 비교용 근사이며 실측 보정이 필요.</li>
+<li>영상시험으로 N50/ROC를 대기·알고리즘 손실까지 통합 보정했다면 별도 대기투과·EO 과업 신뢰도 상한과 중복될 수 있으므로 해당 항을 1로 두거나 함께 재추정해야 함.</li>
+<li>EO 처리 완료 가능 여부는 현재 확정적 0/1 게이트입니다. 시간·속도·처리 지연의 분산이 있으면 향후 확률적 시간 마진 모델로 교체해야 함.</li>
+<li><code>P_classify</code>는 내부 호환 이름입니다. 의미상 발사 후 <code>P_terminal EO</code>입니다.</li>
 </ul>
-<h2>11. 자주 헷갈리는 점 (FAQ)</h2>
-<p><strong>Q1. P_negate가 킬체인 각 단계 확률보다 낮은데 정상인가?</strong>
-정상입니다. P_negate는 5단계의 <strong>곱</strong>입니다. 1 이하 값을 여러 개 곱하면 어떤 개별 값보다 작아집니다.
-기본값: <code>100% × 31.1% × 82.3% × 100% × 91% = 23.3%</code>. 가장 낮은 게이트(P_classify 31.1%)보다도 낮은 건
-뒤의 P_decision(82.3%)·P_kill(91%)이 또 곱해지기 때문. → &quot;모든 단계 통과 확률 ≤ 한 단계 통과 확률&quot;.</p>
-<p><strong>Q2. Pd 전이 폭을 바꿔도 결과가 거의 안 변한다?</strong>
-전이 폭은 탐지 Pd 곡선의 경계 완만도에만 작용합니다. 기본 시나리오는 누적 탐지가 이미 <strong>P_detect≈100%로 포화</strong>라
-체감이 거의 없습니다. 큰 값(1000·2000m)으로 바꾸면 탐지 시점(detect_at)이 안쪽으로 이동 → 분류 거리→인식 경로로
-소폭(+1%p)만 나타납니다. 탐지가 아슬아슬한 설계에서만 크게 작동.</p>
-<p><strong>Q3. 인식/식별 N50을 바꿔도 결과가 안 변할 때가 있다?</strong>
-EO N50은 인식·식별 2개이며, &quot;요구 판별 수준(교전 기준)&quot;에 해당하는 것만 P_classify에 쓰입니다. 기본은 <strong>인식</strong>이라
-인식 N50만 활성(식별 N50 무변). 식별 N50을 반영하려면 교전 기준을 <strong>식별</strong>로 바꾸세요. 교전 기준이 **탐지(레이더
-단독)**면 EO를 안 써서 두 N50 모두 결과에 영향이 없고, EO 표시값은 &quot;—&quot;로 나옵니다. — Q7 참조.
-(참고: &quot;탐지=뭔가 있다&quot;는 레이더 몫(P_detect), &quot;분류=이게 뭔지&quot;는 EO 몫(P_classify: 인식/식별).)</p>
-<p><strong>Q7. 교전 기준(요구 판별 수준)이 결과를 크게 바꾼다?</strong>
-네. 이건 킬체인 <strong>구조</strong>를 바꿉니다. <strong>탐지</strong>(레이더 단독)는 EO 게이트를 아예 빼서 P_negate가 높지만(예 84.7%)
-오교전 위험↑. <strong>인식</strong>(23.3%)·<strong>식별</strong>(7.2%)은 EO 게이트를 적용(식별이 더 엄격). 느슨할수록 무력화율↑·안전성↓의
-트레이드오프이며, <strong>오교전(비위협 격추) 위험</strong>은 C2 그룹의 &quot;오교전 위험 모델&quot; 옵션을 켜면 정량화됩니다
-(탐지 16% / 인식 4% / 식별 1%). P_negate와 별개 지표입니다.</p>
-<p><strong>Q4. &quot;요격기 도달 반경&quot;이 넷건 사거리인가?</strong>
-아닙니다. <strong>요격기 도달 반경</strong>(기본 2500m)은 요격 드론(AB-U10)이 발사대에서 날아가 도달하는 <strong>작전 반경</strong>입니다.
-**넷건 사거리(~25m)**는 도달 후 표적에 붙어 넷을 쏘는 <strong>종말 발사 거리</strong>(별개, 현재 P_kill에 암묵 포함).</p>
-<p><strong>Q5. 넷건·샷건 Pk가 둘 다 있는데 왜 하나만 반영되나?</strong>
-**페이로드(택일)**가 선택한 쪽의 Pk만 P_kill에 들어갑니다. 패널에서 활성 무기는 강조, 비활성은 흐리게 표시됩니다.</p>
-<p><strong>Q6. 기본 P_negate가 23.3%인 이유?</strong>
-게이트 곱(Q1) + <strong>결심-인식 커플링(기본 0.5)</strong>(P_decision 98%→82.3%) + <strong>발사 개시 거리 3 km 교리</strong>입니다.
-3 km에서 쏘려면 EO가 <strong>3.46 km에서 인식</strong>해야 하고, 거기선 표적 픽셀이 7.4 px뿐이라 P_classify가 31.1%로 눌립니다.
-커플링을 **0(독립)**으로 두면 27.8%. 발사 개시 거리를 최적점(≈1.5 km)으로 당기면 44.6%까지 오릅니다
-(§발사 개시 거리 트레이드 — 그 차이가 3 km 교리의 가격표).</p>
-<p><strong>Q8. P_acq(획득 확률)는 입력인가?</strong>
-아닙니다. <strong>계산되는 값</strong>입니다. P_acq = 1−exp(−(HFOV/2)²/(2σ²)), σ=√(큐오차²+지향오차²) — 즉 <strong>화각·큐
-오차·지향 오차(입력)로부터 산출</strong>됩니다. 좌측 패널 = 입력값(편집 가능), 우측 결과카드 = 계산값(P_acq·인식확률·
-P_classify 등, 읽기 전용). P_acq는 좌측에 없고 우측에만 나옵니다.</p>
-<p><strong>Q9. &quot;탐지&quot;와 &quot;분류&quot;는 뭐가 다른가?</strong></p>
+<h2>11. 이론 근거와 값 출처 구분</h2>
 <ul>
-<li><strong>탐지(detection) = &quot;뭔가 있다&quot;</strong> → <strong>레이더</strong> 담당 (P_detect).</li>
-<li><strong>분류(classification) = &quot;이게 뭔지&quot;</strong> → <strong>EO/IR</strong> 담당 (P_classify). EO는 ①<strong>획득</strong>(화면에 들어왔나, P_acq)
-→ ②<strong>분류</strong>(인식=&quot;위협이냐&quot;·식별=&quot;어떤 기종&quot;). EO엔 탐지 단계가 없습니다(탐지는 레이더 몫).</li>
+<li>M. I. Skolnik, <em>Introduction to Radar Systems</em>, 3rd ed. — 레이더 거리 방정식과 RCS 4제곱근 거리 관계.</li>
+<li>J. Johnson, “Analysis of Image Forming Systems”(1958), 이후 NVESD 표적획득 모델 — 탐지·인식·식별 TTP/N50.</li>
+<li>T. A. Sjaardema, C. S. Smith, G. C. Birch, <em>History and Evolution of the Johnson Criteria</em>, SAND2015-6368 (2015), DOI 10.2172/1222446 — D/R/I의 50% cycle 기준과 적용 한계.</li>
+<li>Koschmieder 시정 관계와 Beer–Lambert 법칙 — 균질 대기의 대비/투과 근사.</li>
+<li>원형 2D 가우시안 각오차의 Rayleigh 반경 누적분포 — 고정 FOV 획득확률 근사.</li>
+<li>독립 Bernoulli 시행의 여사건 결합 — 누적 탐지와 다회 사격 <code>1−Π(1−p)</code>.</li>
+<li>1차 등속·직선 radial 운동학 — 반응시간, 접근속도, 발사 후 EO 상대거리, 회합 위치.</li>
 </ul>
-<p><strong>Q10. P_detect가 100%로 나오는데 정상인가?</strong>
-정상이고, <strong>모델 구조상 그렇게 됩니다.</strong> 누적 탐지 <code>P_det = 1−Π(1−pd_i)</code>는 접근 트랙 전체에 걸쳐 <strong>독립 look을
-곱해 지우는</strong> 형태입니다. 기본값에선 진입 6 km→keep-out 500 m 구간을 32.8 m 간격(속도 32.8 m/s × 재방문 1.0 s)으로
-샘플해 <strong>look이 168회</strong> 쌓이고, <code>Π(1−pd)</code>가 천문학적으로 작아져 P_det = 1.000이 됩니다.</p>
-<p>단일 파라미터로는 잘 안 떨어집니다 — 최대 Pd를 0.5로 낮춰도, 탐지거리를 절반으로 줄여도, RCS를 1/10로 해도
-여전히 100%입니다. <strong>지배 레버는 look 수 = 재방문 주기 × 표적 속도</strong>뿐입니다(재방문 20 s·속도 150 m/s면 급락).</p>
-<p>⚠ <strong>해석 주의</strong>: 100%는 &quot;탐지가 완벽하다&quot;가 아니라 **&quot;이 가정 아래선 탐지가 병목이 아니다&quot;**로 읽으세요.
-독립 look 가정이 낙관적입니다(§10 모델 한계). 그리고 P_detect가 100%여도 <strong>탐지가 늦으면</strong> 여전히 문제입니다 —
-그건 P_detect가 아니라 **탐지 여유(필요 탐지거리 대비)**가 잡아냅니다. Q11 참조.</p>
-<p><strong>Q11. 레이더 성능(탐지거리·최대 Pd)을 올려도 P_negate가 안 변한다?</strong>
-정상입니다. <strong>교전이 교리로 개시</strong>되기 때문입니다(§3.0). 탐지 여유가 이미 양수(교리 지배)라면, 탐지를 더 잘해도
-발사 시점·분류 시점·요격 지점이 <strong>하나도 안 움직입니다</strong> — 늘어나는 건 탐지 여유뿐입니다.</p>
-<p>레이더 성능이 P_negate를 움직이는 구간은 **탐지 여유가 음수일 때(⚠ 탐지 제약)**뿐입니다. 결과 카드의
-&quot;탐지 여유&quot;를 먼저 보세요. 양수면 레이더는 이미 충분하고, 자원은 EO 쪽에 써야 합니다.</p>
-<blockquote>
-<p>참고: 예전(교리 층 도입 전) 모델에서는 탐지 성능을 올리면 P_negate가 <strong>떨어졌습니다</strong>. 발사가 탐지에
-묶여 있어 분류가 더 먼 거리로 밀렸기 때문입니다. 지금은 그 인공적 역행이 사라졌습니다.</p>
-</blockquote>
-<p><strong>Q12. 데이터시트에 &quot;Pd 0.9 @ 3 km&quot;라고 있으면 어떻게 넣나?</strong>
-그대로 넣으면 됩니다 — <strong>기준 탐지거리 = 3000, 탐지거리 Pd = 0.9</strong>. 도구가 내부 로지스틱 중심을
-<code>R_half = R_q − w·ln(P_max/p_q − 1) = 3726 m</code>로 역산합니다.</p>
-<p>⚠ <strong>하지 말아야 할 것</strong>: 예전처럼 기준 탐지거리에 3000만 넣고 확률을 무시하는 것. 그러면 3 km가 <strong>Pd 50% 지점</strong>으로
-해석돼 실제보다 나쁜 레이더가 됩니다. &quot;탐지거리&quot;는 항상 <strong>확률과 짝</strong>으로 말해야 의미가 생깁니다.
-(최대 Pd·전이 폭은 고급 접이식에 있으며, <strong>탐지거리 Pd보다 최대 Pd가 커야</strong> 합니다.)</p>
-<p><strong>Q13. 확률에 95를 넣었더니 P_negate가 이상하게 높게 나온다?</strong>
-<strong>확률은 0~1입니다. 95는 95%가 아니라 &quot;9500%&quot;로 읽힙니다.</strong> 모델은 모든 게이트를 <code>clamp(x, 0, 1)</code> 하므로
-95는 조용히 **1.0(=100%)**이 되고, 그 단계가 <strong>아예 없는 것처럼</strong> 동작합니다. 예: 분류기 상한에 95를 넣으면
-P_classify가 31.1% → **100%**가 되어 P_negate가 23.3% → **74.9%**로 튑니다.</p>
-<p>지금은 이런 값이 들어오면 <strong>좌측 패널과 결과 영역에 빨간 배너</strong>가 뜨고 해당 필드가 붉게 표시되며,
-<strong>해석식·몬테카를로·커버리지·트레이드·역산·비교 계산과 JSON/MD 리포트 생성이 중단됩니다.</strong>
-파라미터 설명과 CSV 저장은 오류를 이해하고 수정할 수 있도록 계속 사용할 수 있습니다.
-<code>↺ 범위로 자동 수정</code> 버튼으로 전부 유효 범위로 되돌릴 수 있습니다. CSV 불러오기도 범위 밖 값을 보고합니다
-(엑셀에서 0.95가 95로 바뀌는 사고가 가장 흔합니다).</p>
-<p>검사 항목은 두 가지입니다:</p>
+<p>위 문헌은 <strong>모델 형태의 근거</strong>입니다. 화면의 기본 숫자가 해당 문헌에서 측정된 값이라는 뜻은 아닙니다.
+각 숫자의 출처는 도움말의 <code>값 출처</code>에 별도로 표시되며, 대부분 편집 가능한 미확정 가정입니다.</p>
+<h2>12. 검증 기준</h2>
+<p>다음 회귀 조건을 자동 테스트합니다.</p>
 <ul>
-<li><strong>범위 검사</strong> — 파라미터별 물리적 유효 범위(확률 0<del>1, 거리 ≥0, 방위 0</del>360°, 정수여야 하는 값 등)</li>
-<li><strong>교차 검사</strong> — 값 하나만으론 알 수 없는 관계: <code>탐지거리 Pd &lt; 최대 Pd</code>, <code>발사 개시 거리 &gt; keep-out</code>,
-<code>발사대 거리 &lt; 발사 개시 거리</code>, <code>인식 N50 ≤ 식별 N50</code>, <code>진입 거리 ≥ 필요 탐지거리</code> 등
-(마지막 둘은 <strong>경고</strong> — 계산은 되지만 의도와 다를 수 있다는 뜻)</li>
+<li>0.35 m·1920 px·500 m·20 px → HFOV 약 3.85°</li>
+<li>2 m·1920 px·500 m·20 px → HFOV 약 22.00°</li>
+<li>기본 시나리오 발사거리 3000 m 유지</li>
+<li>EO 시작 상대거리 996.8 m, 완료 상대거리 500 m</li>
+<li>EO 처리 시작은 발사 후, 완료는 요격 전</li>
+<li>광학 설계가 발사 교리 값을 덮어쓰지 않음</li>
 </ul>
-<p><strong>Q14. 몬테카를로 &quot;누수 원인&quot;에서 탐지가 0이고 살상이 이상하게 크다?</strong>
-두 가지를 나눠서 봐야 합니다.</p>
-<p><strong>① 탐지 0은 정상입니다.</strong> 이 패널은 킬체인 순서(탐지→분류→결심→도달→살상)로 판정해 <strong>처음 실패한 단계만
-1회</strong> 집계합니다. P_detect가 100%면 탐지는 절대 첫 실패가 될 수 없으므로 항상 0입니다. <strong>0 = &quot;그 단계의 확률이
-0&quot;이 아니라 &quot;그 단계가 첫 실패인 적이 없다&quot;</strong> 입니다. 같은 이유로 앞 단계가 크게 깎으면 뒷 단계 숫자는
-자동으로 작아집니다(도달 0도 같은 이유).</p>
-<p><strong>② 살상이 크게 나온다면 대부분 앞 단계가 클램프된 상태입니다.</strong> 기본값에서는 살상 첫 실패가 전체의 ~3%인데,
-분류기 상한에 95를 넣어 P_classify가 100%로 클램프되면 분류에서 아무도 안 걸러져 살상 실패가 **~10%(누수의 36%)**로
-튑니다. 즉 &quot;살상이 이상하다&quot;는 <strong>살상 파라미터 문제가 아니라 앞 단계 입력 오류의 증상</strong>입니다 — Q13의 배너를 먼저 보세요.</p>
-<blockquote>
-<p>🔧 관련 수정: 이전에는 MC가 사격 기회 수를 <code>max(0, …)</code>로 샘플링해 약 1.6%의 시행이 <strong>0발</strong>이 되고
-그 시행의 P_kill이 0이 됐습니다. 요격기가 도달했는데 0발을 쏘는 건 물리적 결과가 아니므로 하한을 1발로 고쳤습니다.</p>
-</blockquote>
-<hr>
-<p><em>이 매뉴얼은 도구 현재 구현 상태 기준이며, 모델·파라미터가 갱신되면 함께 갱신합니다.</em>
-<em>MD가 원본이며, <code>pnpm gen:docs</code>로 같은 이름의 <code>.html</code>을 재생성해 함께 관리합니다.</em></p>
 
 </body></html>

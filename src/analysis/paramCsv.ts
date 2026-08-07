@@ -119,11 +119,11 @@ export function scenarioToCsv(scenario: Scenario): string {
   lines.push(
     toRow([
       'EO/IR',
-      '요구 판별 수준',
+      '종말 확인 정책',
       DISC_KEY,
       scenario.optics.required_discrimination,
       '',
-      "교전 승인 요구 판별 수준('detection'/'recognition'/'identification'). 해당 N50이 P_classify에 사용.",
+      "발사 후 종말 확인 정책('radar_only' 또는 EO 'detection'/'recognition'/'identification'). EO D/R/I는 해당 N50을 사용.",
       '운용 설정값',
       '', '', '',
     ]),
@@ -200,7 +200,7 @@ export function applyCsv(base: Scenario, text: string): CsvImportResult {
     }
 
     if (key === DISC_KEY) {
-      if (rawVal === 'detection' || rawVal === 'recognition' || rawVal === 'identification') {
+      if (rawVal === 'radar_only' || rawVal === 'detection' || rawVal === 'recognition' || rawVal === 'identification') {
         scenario = { ...scenario, optics: { ...scenario.optics, required_discrimination: rawVal } }
         applied++
       }

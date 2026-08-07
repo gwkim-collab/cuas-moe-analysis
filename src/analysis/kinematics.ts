@@ -16,15 +16,14 @@
 //   R_launch = min(R_commit, R_detect − v_t·t_react)
 //   R_required_detection = R_commit + v_t·t_react
 //
-//   react window: classify + operator decision + launch delay.
+//   pre-launch react window: operator decision + launch delay.
 //   interceptor from pad (R_pad) flies out at v_i; threat flies in
 //   at v_t → they close the gap (R_launch − R_pad) at (v_i + v_t).
 //   intercept range from asset R_int = R_pad + v_i·t_meet.
 //
-// Classification is back-solved from the launch point rather than
-// pinned to detection + t_classify: the crew classifies as LATE (as
-// close, so as sharp) as the decision timeline permits. The two
-// coincide exactly in the detection-limited branch.
+// EO/IR terminal D/R/I is performed by the interceptor AFTER launch.
+// Its camera↔target relative-range timeline is solved separately by
+// terminalEoSolution(); it is not part of the pre-launch detection budget.
 //
 // Feasible iff the intercept happens before the threat crosses the
 // keep-out ring, within the interceptor's max reach, and the threat
@@ -58,12 +57,6 @@ export interface ReachSolution {
   detection_limited: boolean
   /** Threat range from asset at the moment the interceptor launches (m). */
   threat_range_at_launch_m: number
-  /**
-   * Horizontal threat range (m) at which classification must conclude — back-
-   * solved from launch: R_launch + v_t·(t_decision + t_launch). Drives the EO
-   * geometry in moe.ts.
-   */
-  classify_at_range_m: number
   /** Time from launch to intercept (s). */
   time_to_meet_s: number
   /** Range from asset where intercept occurs (m). */
@@ -82,6 +75,27 @@ export interface ReachSolution {
    * beyond usable reach). σ→0 recovers the hard 0/1 gate.
    */
   reach_probability: number
+}
+
+export interface TerminalEoSolution {
+  /** Camera↔target separation when the interceptor launches (m). */
+  separation_at_launch_m: number
+  /** Separation where onboard EO processing must begin (m). */
+  processing_start_separation_m: number
+  /** Requested separation where recognition/identification completes (m). */
+  recognition_separation_m: number
+  processing_start_after_launch_s: number
+  recognition_after_launch_s: number
+  /** Target and interceptor asset-relative ranges at processing start. */
+  target_range_at_start_m: number
+  interceptor_range_at_start_m: number
+  /** Target and interceptor asset-relative ranges at recognition completion. */
+  target_range_at_recognition_m: number
+  interceptor_range_at_recognition_m: number
+  /** Time remaining from EO completion to kinematic intercept. */
+  time_remaining_to_intercept_s: number
+  timing_feasible: boolean
+  reason: string
 }
 
 // Standard-normal CDF via an erf approximation (Abramowitz-Stegun 7.1.26).
@@ -106,7 +120,69 @@ export function timeBudget(s: Scenario): TimeBudget {
     classify_s,
     decision_s,
     launch_delay_s,
-    react_total_s: classify_s + decision_s + launch_delay_s,
+    // EO classification is an onboard, post-launch activity. Radar detection
+    // only needs to leave room for launch approval and spin-up.
+    react_total_s: decision_s + launch_delay_s,
+  }
+}
+
+/**
+ * Solve the onboard EO timeline in interceptor↔target relative range.
+ * First-order assumption: both vehicles are on the same radial/altitude during
+ * terminal closure, so LOS separation closes at v_i+v_t.
+ */
+export function terminalEoSolution(s: Scenario, reach: ReachSolution): TerminalEoSolution {
+  const vT = s.threat.speed_m_s
+  const vI = s.effector.cruise_speed_m_s
+  const closingSpeed = vI + vT
+  const rPad = s.effector.launch_pad_range_from_asset_m
+  const separation_at_launch_m = Math.max(0, reach.threat_range_at_launch_m - rPad)
+  const recognition_separation_m = Math.max(1, s.optics.terminal_recognition_range_m)
+  const processing_start_separation_m =
+    recognition_separation_m + closingSpeed * s.sensor.classify_time_s
+
+  const processing_start_after_launch_s =
+    (separation_at_launch_m - processing_start_separation_m) / Math.max(1e-9, closingSpeed)
+  const recognition_after_launch_s =
+    (separation_at_launch_m - recognition_separation_m) / Math.max(1e-9, closingSpeed)
+
+  const target_range_at_start_m =
+    reach.threat_range_at_launch_m - vT * processing_start_after_launch_s
+  const interceptor_range_at_start_m = rPad + vI * processing_start_after_launch_s
+  const target_range_at_recognition_m =
+    reach.threat_range_at_launch_m - vT * recognition_after_launch_s
+  const interceptor_range_at_recognition_m = rPad + vI * recognition_after_launch_s
+  const time_remaining_to_intercept_s = recognition_separation_m / Math.max(1e-9, closingSpeed)
+
+  let timing_feasible = true
+  let reason = ''
+  if (closingSpeed <= 0) {
+    timing_feasible = false
+    reason = 'interceptor and threat do not close'
+  } else if (processing_start_after_launch_s < 0) {
+    timing_feasible = false
+    reason = 'EO processing would have to start before interceptor launch'
+  } else if (recognition_after_launch_s > reach.time_to_meet_s) {
+    timing_feasible = false
+    reason = '선택한 EO 탐지/인식/식별 과업이 요격 이후에 완료됩니다.'
+  } else if (!reach.feasible) {
+    timing_feasible = false
+    reason = reach.reason
+  }
+
+  return {
+    separation_at_launch_m,
+    processing_start_separation_m,
+    recognition_separation_m,
+    processing_start_after_launch_s,
+    recognition_after_launch_s,
+    target_range_at_start_m,
+    interceptor_range_at_start_m,
+    target_range_at_recognition_m,
+    interceptor_range_at_recognition_m,
+    time_remaining_to_intercept_s,
+    timing_feasible,
+    reason,
   }
 }
 
@@ -130,14 +206,6 @@ export function reachSolution(s: Scenario, detect_at_range_m: number): ReachSolu
   const detection_limited = earliest_launch_m < commit_range_m
   const threat_range_at_launch_m = Math.min(commit_range_m, earliest_launch_m)
 
-  // Classification concludes just far enough ahead of launch to leave room for
-  // the decision and launch delay — i.e. as close (as sharp an image) as the
-  // timeline allows. Detection-limited case reduces to detect_at − v_t·t_classify.
-  const classify_at_range_m = Math.max(
-    1,
-    threat_range_at_launch_m + vT * (budget.decision_s + budget.launch_delay_s),
-  )
-
   const base: Omit<ReachSolution, 'feasible' | 'reason' | 'margin_m' | 'margin_s' | 'reach_probability'> = {
     detect_at_range_m,
     budget,
@@ -147,7 +215,6 @@ export function reachSolution(s: Scenario, detect_at_range_m: number): ReachSolu
     detection_margin_s: detection_margin_m / vT,
     detection_limited,
     threat_range_at_launch_m,
-    classify_at_range_m,
     time_to_meet_s: 0,
     intercept_range_m: 0,
   }

@@ -30,6 +30,7 @@ describe('CSV round-trip', () => {
     const s = defaultScenario()
     s.threat.speed_m_s = 44
     s.optics.hfov_deg = 3.3
+    s.optics.required_discrimination = 'detection'
     s.effector.payload = 'shotgun'
     const csv = scenarioToCsv(s)
     const { scenario: back, applied, unknownKeys } = applyCsv(defaultScenario(), csv)
@@ -37,6 +38,7 @@ describe('CSV round-trip', () => {
     expect(applied).toBeGreaterThan(10)
     expect(back.threat.speed_m_s).toBeCloseTo(44, 9)
     expect(back.optics.hfov_deg).toBeCloseTo(3.3, 9)
+    expect(back.optics.required_discrimination).toBe('detection')
     expect(back.effector.payload).toBe('shotgun')
     // The full MOE should match after the round-trip.
     expect(computeMoe(back).p_negate).toBeCloseTo(computeMoe(s).p_negate, 9)
